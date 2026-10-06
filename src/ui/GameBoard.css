@@ -1,0 +1,50 @@
+.gameboard {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  container-type: inline-size;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.04) inset,
+    0 18px 40px -18px rgb(0 0 0 / 0.55);
+  user-select: none;
+}
+
+.gameboard.small {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.gameboard-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.gameboard-mark {
+  position: absolute;
+  /* Inside the square: the library's board clips anything that pokes out. */
+  top: 3%;
+  right: 3%;
+  width: 34%;
+  height: 34%;
+  z-index: 2;
+  pointer-events: none;
+  animation: mark-in 180ms ease-out;
+}
+
+.gameboard-mark svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.45));
+}
+
+@keyframes mark-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}

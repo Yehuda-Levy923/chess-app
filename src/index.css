@@ -1,0 +1,342 @@
+/*
+ * Themes. Walnut is the default and sits behind the wood boards; Paper and
+ * Graphite are what "Match system" resolves to (no data-theme attribute).
+ * The three --tone-* colours were validated as a set for colour-blind
+ * separation (light set on Paper, dark set on the dark themes). Adding a fourth
+ * hue (a green for "best") failed that check against the orange, so the quiet
+ * classifications share one neutral and differ by icon.
+ */
+:root {
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Sitka Heading', 'Sitka Display', 'Sitka', Georgia, serif;
+
+  --badge-quiet: #6a645a;
+  --badge-warn: #f3eee4;
+  --badge-warn-ink: #2a2622;
+  --last-move: rgb(247 214 92 / 0.5);
+  --check: rgb(214 52 52 / 0.9);
+  --check-fill: rgb(214 52 52 / 0.3);
+  --best-arrow: rgb(42 120 214 / 0.85);
+  --grain-opacity: 0.05;
+  --backdrop: none;
+  --accent: var(--ink);
+  --accent-ink: var(--surface);
+  --accent-hover: var(--ink-2);
+  --btn-face: var(--surface-raised);
+  --btn-face-hover: var(--select);
+  --btn-edge: var(--rule-strong);
+  --btn-sheen: rgb(255 255 255 / 0.05);
+}
+
+:root,
+:root[data-theme='paper'] {
+  color-scheme: light;
+  --surface: #f4f1ea;
+  --surface-raised: #fcfaf5;
+  --surface-sunk: #e9e5db;
+  --ink: #1d1b17;
+  --ink-2: #57534b;
+  --ink-3: #807b71;
+  --rule: #dcd7cb;
+  --rule-strong: #bdb6a7;
+  --select: #e2ddd0;
+  --tone-found: #2a78d6;
+  --tone-error: #eb6834;
+  --tone-blunder: #a3201c;
+  --graph-white: #fdfcf8;
+  --graph-black: #3b3833;
+  --graph-mid: #8a857b;
+  --grain-opacity: 0.06;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --surface: #161616;
+    --surface-raised: #1f1f1e;
+    --surface-sunk: #101010;
+    --ink: #ecebe6;
+    --ink-2: #b5b3ab;
+    --ink-3: #8a887f;
+    --rule: #2d2d2b;
+    --rule-strong: #45443f;
+    --select: #333230;
+    --tone-found: #3987e5;
+    --tone-error: #c98500;
+    --tone-blunder: #d23c3c;
+    --graph-white: #e6e4dc;
+    --graph-black: #0b0b0b;
+    --graph-mid: #5f5e59;
+  }
+}
+
+:root[data-theme='graphite'] {
+  color-scheme: dark;
+  --surface: #161616;
+  --surface-raised: #1f1f1e;
+  --surface-sunk: #101010;
+  --ink: #ecebe6;
+  --ink-2: #b5b3ab;
+  --ink-3: #8a887f;
+  --rule: #2d2d2b;
+  --rule-strong: #45443f;
+  --select: #333230;
+  --tone-found: #3987e5;
+  --tone-error: #c98500;
+  --tone-blunder: #d23c3c;
+  --graph-white: #e6e4dc;
+  --graph-black: #0b0b0b;
+  --graph-mid: #5f5e59;
+}
+
+:root[data-theme='walnut'] {
+  color-scheme: dark;
+  --surface: #1c1814;
+  --surface-raised: #25201b;
+  --surface-sunk: #14110e;
+  --ink: #efe6d8;
+  --ink-2: #c3b6a3;
+  --ink-3: #94877a;
+  --rule: #352e27;
+  --rule-strong: #4f453a;
+  --select: #3b3229;
+  --tone-found: #3987e5;
+  --tone-error: #c98500;
+  --tone-blunder: #d23c3c;
+  --graph-white: #efe6d8;
+  --graph-black: #0d0b09;
+  --graph-mid: #665b4f;
+  --grain-opacity: 0.07;
+}
+
+:root[data-theme='felt'] {
+  color-scheme: dark;
+  --surface: #11201a;
+  --surface-raised: #182b22;
+  --surface-sunk: #0b1611;
+  --ink: #e9efe8;
+  --ink-2: #b3c1b6;
+  --ink-3: #85978a;
+  --rule: #233a2f;
+  --rule-strong: #375244;
+  --select: #29443a;
+  --tone-found: #3987e5;
+  --tone-error: #c98500;
+  --tone-blunder: #d23c3c;
+  --graph-white: #e9efe8;
+  --graph-black: #07100c;
+  --graph-mid: #4e6457;
+  --grain-opacity: 0.08;
+}
+
+/*
+ * Fire: the user's photo behind everything. The overlay is heaviest at the
+ * edges where text sits and lightest down the middle, and panels carry their
+ * own near-opaque fill, so the flames read as light behind the work rather
+ * than under it.
+ */
+:root[data-theme='fire'] {
+  color-scheme: dark;
+  --surface: #0a0504;
+  --surface-raised: rgb(20 10 7 / 0.9);
+  --surface-sunk: rgb(0 0 0 / 0.45);
+  --ink: #fff1e2;
+  --ink-2: #e7c6a9;
+  --ink-3: #b48f74;
+  --rule: rgb(255 150 80 / 0.14);
+  --rule-strong: rgb(255 150 80 / 0.3);
+  --select: rgb(255 110 30 / 0.18);
+  --tone-found: #3987e5;
+  --tone-error: #c98500;
+  --tone-blunder: #d23c3c;
+  --graph-white: #fff1e2;
+  --graph-black: #0d0605;
+  --graph-mid: #6e4d3c;
+  --grain-opacity: 0.06;
+  --accent: #ff6a1a;
+  --accent-ink: #1c0802;
+  --accent-hover: #ff8338;
+  --btn-face: rgb(40 18 10 / 0.85);
+  --btn-face-hover: rgb(70 30 14 / 0.9);
+  --btn-edge: rgb(255 140 70 / 0.32);
+  --btn-sheen: rgb(255 200 150 / 0.08);
+  --backdrop:
+    linear-gradient(90deg, rgb(205 120 85) 0%, rgb(255 214 176) 24%, rgb(205 112 74) 37%, rgb(52 19 10) 47%, rgb(30 10 6) 100%),
+    url('/backgrounds/fire.jpg') center 32% / cover no-repeat;
+  /* Mirrored so the flame climbs the right half, behind the board, not the text.
+     The gradient is mirrored with it: its 100% end is the screen's left edge. */
+  --backdrop-transform: scaleX(-1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--surface);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 200ms;
+}
+
+/* Theme photo, if any. Fixed so it stays put while the games list scrolls. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: var(--backdrop);
+  transform: var(--backdrop-transform, none);
+  /* Multiply, so dimmed flames stay red-orange instead of going olive under grey. */
+  background-blend-mode: multiply;
+}
+
+/* A faint grain so the large flat surfaces read as material, not as an empty canvas. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tone-found);
+  outline-offset: 2px;
+}
+
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.dim {
+  color: var(--ink-3);
+}
+
+.tone-found {
+  color: var(--tone-found);
+}
+.tone-error {
+  color: var(--tone-error);
+}
+.tone-blunder {
+  color: var(--tone-blunder);
+}
+
+/* Buttons shared by every screen. A pressed-in face with a faint top sheen,
+   so they read as things to push rather than as outlined text. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--btn-edge);
+  border-radius: 3px;
+  background: var(--btn-face);
+  box-shadow: inset 0 1px 0 var(--btn-sheen), 0 1px 0 rgb(0 0 0 / 0.25);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    border-color 120ms,
+    background-color 120ms,
+    transform 60ms;
+}
+
+.btn:not(:disabled):hover {
+  border-color: var(--ink-3);
+  background: var(--btn-face-hover);
+}
+
+.btn:not(:disabled):active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 0 rgb(0 0 0 / 0.3);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* Disabled: drop the face entirely rather than fading it, so it can't pass for a pressable one. */
+.btn:disabled {
+  opacity: 1;
+  background: transparent;
+  border-color: var(--rule);
+  box-shadow: none;
+  color: var(--ink-3);
+}
+
+.btn:disabled svg {
+  opacity: 0.6;
+}
+
+.btn-icon {
+  width: 36px;
+  padding: 0;
+}
+
+.btn-quiet {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-2);
+  font-weight: 400;
+}
+
+.btn-quiet:not(:disabled):hover {
+  color: var(--ink);
+  border-color: transparent;
+  background: var(--select);
+}
+
+.btn svg {
+  flex-shrink: 0;
+}

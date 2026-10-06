@@ -1,0 +1,33 @@
+/* Classification marks */
+.badge {
+  flex-shrink: 0;
+  display: block;
+  color: #fff;
+}
+
+.badge .badge-disc {
+  fill: var(--badge-quiet);
+}
+
+.badge-found .badge-disc {
+  fill: var(--tone-found);
+}
+
+.badge-error .badge-disc {
+  fill: var(--tone-error);
+}
+
+.badge-blunder .badge-disc {
+  fill: var(--tone-blunder);
+}
+
+/* Inaccuracy: the light disc, told apart from the quiet marks by value rather than hue */
+.badge-warn {
+  color: var(--badge-warn-ink);
+}
+
+.badge-warn .badge-disc {
+  fill: var(--badge-warn);
+  stroke: rgb(0 0 0 / 0.28);
+  stroke-width: 1;
+}
