@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ChessComGame } from './chesscom/api'
 import { AppearanceContext, applyTheme, loadAppearance, saveAppearance, type Appearance } from './ui/appearance'
 import { AppearanceSheet } from './ui/AppearanceSheet'
+import { InsightsScreen } from './ui/InsightsScreen'
 import { ReviewScreen } from './ui/ReviewScreen'
 import { StartScreen } from './ui/StartScreen'
 
@@ -28,6 +29,7 @@ export default function App() {
   const [game, setGame] = useState<ChessComGame | null>(null)
   const [appearance, setAppearanceState] = useState<Appearance>(loadAppearance)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [insightsOpen, setInsightsOpen] = useState(false)
 
   useEffect(() => applyTheme(appearance.theme), [appearance.theme])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
@@ -48,6 +50,8 @@ export default function App() {
     <AppearanceContext.Provider value={ctx}>
       {game ? (
         <ReviewScreen game={game} username={username} depth={depth} onBack={() => setGame(null)} />
+      ) : insightsOpen && username ? (
+        <InsightsScreen username={username} onBack={() => setInsightsOpen(false)} />
       ) : (
         <StartScreen
           username={username}
@@ -61,6 +65,7 @@ export default function App() {
             remember('depth', String(d))
           }}
           onOpen={setGame}
+          onInsights={() => setInsightsOpen(true)}
         />
       )}
       {settingsOpen && <AppearanceSheet onClose={closeSettings} />}

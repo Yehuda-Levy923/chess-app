@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Chess, type PieceSymbol } from 'chess.js'
 import type { Arrow } from 'react-chessboard'
 import type { ChessComGame, ChessComPlayer } from '../chesscom/api'
-import { getBook } from '../openings'
 import { winPercent } from '../review/accuracy'
-import { analyseGame } from '../review/analyseGame'
-import { buildReview, LABELS, movesFromPgn } from '../review/buildReview'
-import { loadReview, saveReview } from '../review/cache'
+import { classifyPlayedMove, LABELS, terminalScore, type Judgement } from '../review/buildReview'
+import { estimateRating } from '../review/gameRating'
+import { phaseGrades, phaseStarts, type PhaseName } from '../review/phases'
+import { reviewGame } from '../review/reviewGame'
 import { formatScore, uciToSan } from '../review/format'
-import type { Label, Review, ReviewedMove } from '../review/types'
+import type { Label, PositionAnalysis, Review, ReviewedMove } from '../review/types'
 import { getEngine } from '../stockfish/shared'
 import { pieceSetById, useAppearance, type PieceCode } from './appearance'
 import { Badge } from './Badge'
@@ -16,10 +16,10 @@ import { EvalBar } from './EvalBar'
 import { EngineLines } from './EngineLines'
 import { EvalGraph } from './EvalGraph'
 import { GameBoard } from './GameBoard'
-import { captures, checkedKing, clocksFromPgn, formatClock, timeSpent } from './gameInfo'
+import { captures, checkedKing, clocksFromPgn, formatClock } from './gameInfo'
 import { IconBack, IconBoard, IconExternal, IconFirst, IconFlip, IconKeyNext, IconKeyPrev, IconLast, IconNext, IconPrev, IconRetry } from './icons'
 import { KEY_LABELS, LABEL_TEXT, toneOf } from './labels'
-import { classifyFree, useLiveAnalysis, type BestInfo, type Live } from './liveAnalysis'
+import { useLiveAnalysis, type Live } from './liveAnalysis'
 import { MoveList } from './MoveList'
 import { judge, RetryPanel, type Attempt } from './RetryPanel'
 import './ReviewScreen.css'
@@ -28,6 +28,8 @@ type Props = { game: ChessComGame; username: string; depth: number; onBack: () =
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const RETRY_LABELS = ['mistake', 'miss', 'blunder']
+/** A free move is only graded once the position before it was searched at least this deep. */
+const MIN_JUDGE_DEPTH = 12
 const BEST_ARROW = 'rgb(42 120 214 / 0.85)'
 
 function playMove(fen: string, from: string, to: string): { fen: string; san: string } | null {
@@ -97,13 +99,7 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
   useEffect(() => {
     const abort = new AbortController()
     ;(async () => {
-      const cached = await loadReview(game.uuid, depth)
-      if (cached) return setReview(cached)
-      const moves = movesFromPgn(game.pgn)
-      setProgress([0, moves.length + 1])
-      const analyses = await analyseGame(getEngine(), moves, depth, (d, t) => setProgress([d, t]), abort.signal)
-      const r = buildReview(game.uuid, moves, analyses, getBook())
-      await saveReview(r)
+      const { review: r } = await reviewGame(game, depth, getEngine(), (d, t) => setProgress([d, t]), abort.signal)
       if (!abort.signal.aborted) setReview(r)
     })().catch((e) => {
       if (!abort.signal.aborted) setError(e instanceof Error ? e.message : String(e))
@@ -211,22 +207,40 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
 
   const current: ReviewedMove | null = ply > 0 ? review.moves[ply - 1] : null
 
-  // What the engine thought of the position a free move was played from. The
-  // branch point falls back to the review's own analysis of it.
-  const parentInfo = (fenBefore: string, isBranchPoint: boolean): BestInfo | null => {
-    const m = memo.get(fenBefore)
-    if (m?.lines[0]) return { score: m.lines[0].score, uci: m.lines[0].pv[0] ?? null, second: m.lines[1]?.score ?? null }
-    const rm = isBranchPoint && variation ? review.moves[variation.basePly] : null
-    return rm?.scoreBest ? { score: rm.scoreBest, uci: rm.bestUci, second: null } : null
+  // The engine's view of a position in the explored line: finished positions
+  // need no search, the branch point can use the review's own (usually deeper)
+  // analysis, everything else comes from the live search.
+  const analysisOf = (f: string, mainPly: number | null): PositionAnalysis | null => {
+    const over = terminalScore(f)
+    if (over) return { fen: f, depth: Infinity, lines: [{ score: over, pv: [] }] }
+    const m = memo.get(f)
+    const stored = mainPly !== null ? review.analyses?.[mainPly] : undefined
+    if (stored && stored.depth >= (m?.depth ?? 0)) return stored
+    return m?.depth ? { fen: f, depth: m.depth, lines: m.lines } : null
   }
+
+  // Each free move is judged the way the review judges game moves, but only
+  // once the position it was played from has been searched deep enough; a quick
+  // drag would otherwise be graded against a shallow guess.
+  const judgements: (Judgement | null)[] = []
+  if (variation) {
+    variation.moves.forEach((m, i) => {
+      const before = analysisOf(m.fenBefore, i === 0 ? variation.basePly : null)
+      const after = analysisOf(m.fenAfter, null)
+      const prevVar = i > 0 ? variation.moves[i - 1] : null
+      const prevMain = i === 0 && variation.basePly > 0 ? review.moves[variation.basePly - 1] : null
+      const prevLoss = prevVar ? judgements[i - 1]?.loss : prevMain?.loss
+      const prev = prevVar ?? prevMain
+      const previous = prev && prevLoss !== undefined ? { loss: prevLoss, uci: prev.uci, captured: prev.san.includes('x') } : null
+      judgements.push(before && after && before.depth >= MIN_JUDGE_DEPTH ? classifyPlayedMove(m.fenBefore, m.uci, before, after, previous) : null)
+    })
+  }
+  const labelOf = (i: number): Label | null => judgements[i]?.label ?? null
+  const varJudgement = variation && varMove ? judgements[variation.index - 1] : null
+  const varLabel = varJudgement?.label ?? null
+  const varParent = varJudgement?.bestUci && varJudgement.scoreBest ? { uci: varJudgement.bestUci, score: varJudgement.scoreBest } : null
   const scoreOf = (f: string) => memo.get(f)?.lines[0]?.score ?? (live?.fen === f ? live.over : null)
-  const labelOf = (i: number): Label | null => {
-    const m = variation!.moves[i]
-    return classifyFree(m.fenBefore, m.uci, parentInfo(m.fenBefore, i === 0), scoreOf(m.fenAfter))
-  }
-  const varLabel = variation && varMove ? labelOf(variation.index - 1) : null
-  const varParent = variation && varMove ? parentInfo(varMove.fenBefore, variation.index === 1) : null
-  const varScore = varMove ? scoreOf(varMove.fenAfter) : null
+  const varScore = varMove ? (varJudgement?.scoreAfter ?? scoreOf(varMove.fenAfter)) : null
 
   const score = retryTarget
     ? retryTarget.scoreBest!
@@ -269,7 +283,21 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
 
   const startRetry = (index: number) => setRetry({ index, attempt: null, fen: null, revealed: false })
   const currentTarget = current ? targets.indexOf(current) : -1
-  const spent = current ? timeSpent(clocks, current.ply, game.timeControl) : null
+
+  /** Opens the engine's line from before `move` as an explored line, at its first move. */
+  const showBestLine = (move: ReviewedMove) => {
+    const line: FreeMove[] = []
+    let at = move.fenBefore
+    for (const u of move.bestLine ?? []) {
+      const m = playUci(at, u)
+      if (!m) break
+      line.push(m)
+      at = m.fenAfter
+    }
+    if (line.length === 0) return
+    setPly(move.ply - 1)
+    setVariation({ basePly: move.ply - 1, moves: line, index: 1 })
+  }
 
   /** Plays moves from the shown position. Moves that repeat the game itself stay on the main line. */
   const extendWith = (ucis: string[]) => {
@@ -343,16 +371,34 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
     )
   }
 
+  const grades = phaseGrades(review)
+
   const accuracyRow = (side: 'white' | 'black') => {
     const p = side === 'white' ? game.white : game.black
+    const accuracy = review.accuracy[side === 'white' ? 'w' : 'b']
+    // chess.com records the rating after the game; the shift is a few points, well inside the model's error.
+    const est = estimateRating(accuracy, game.timeClass, p.rating || null)
     return (
       <div className={`acc ${side}`}>
         <span className="acc-name">
           <span className={`player-swatch ${side}`} aria-hidden />
           {p.username}
         </span>
-        <span className="acc-value num">{review.accuracy[side === 'white' ? 'w' : 'b'].toFixed(1)}</span>
+        <span className="acc-value num">{accuracy.toFixed(1)}</span>
         {game.accuracies && <span className="acc-theirs num">chess.com {game.accuracies[side].toFixed(1)}</span>}
+        {est && (est.blended ?? est.accuracyOnly) !== null && (
+          <span className="acc-rating">
+            Played like <span className="num">{(est.blended ?? est.accuracyOnly).toLocaleString()}</span>
+          </span>
+        )}
+        {est && est.blended !== null && (
+          <span className="acc-rating-alone num" title="Accuracy barely changes with rating, so on its own it only narrows a game down this far">
+            <span>accuracy alone {est.accuracyOnly.toLocaleString()}</span>
+            <span>
+              range {est.low.toLocaleString()}–{est.high.toLocaleString()}
+            </span>
+          </span>
+        )}
       </div>
     )
   }
@@ -397,11 +443,16 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
 
         <div className="accuracy">
           {accuracyRow('white')}
-          <span className="acc-label">Accuracy</span>
+          <span className="acc-label">
+            Accuracy
+            <span className="acc-depth num" title="The shallowest depth any position in this game reached">
+              depth {review.minDepth || review.depth}+
+            </span>
+          </span>
           {accuracyRow('black')}
         </div>
 
-        <EvalGraph review={review} ply={ply} onPly={(p) => !retry && go(p)} />
+        <EvalGraph review={review} ply={ply} onPly={(p) => !retry && go(p)} phases={phaseStarts(review)} />
 
         <EngineLines
           live={live}
@@ -423,29 +474,55 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
         </div>
 
         {tab === 'report' ? (
-          <table className="summary">
-            <thead>
-              <tr>
-                <th />
-                <th className="r">{game.white.username}</th>
-                <th className="r">{game.black.username}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {LABELS.map((l) => (
-                <tr key={l} className={review.counts.w[l] || review.counts.b[l] ? '' : 'empty'}>
-                  <td>
-                    <span className="summary-label">
-                      <Badge label={l} size={18} />
-                      {LABEL_TEXT[l].name}
-                    </span>
-                  </td>
-                  <td className="r num">{review.counts.w[l] || ''}</td>
-                  <td className="r num">{review.counts.b[l] || ''}</td>
+          <div className="report">
+            <table className="summary">
+              <thead>
+                <tr>
+                  <th />
+                  <th className="r">{game.white.username}</th>
+                  <th className="r">{game.black.username}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {PHASES.map((ph) => {
+                  const w = grades.w[ph]
+                  const b = grades.b[ph]
+                  if (!w && !b) return null
+                  return (
+                    <tr key={ph}>
+                      <td>{PHASE_TEXT[ph]}</td>
+                      {[w, b].map((g, i) => (
+                        <td key={i} className="r">
+                          {g && (
+                            <span className="phase-grade" title={`${LABEL_TEXT[g.label].name}, ${g.moves} moves`}>
+                              <span className="num">{g.accuracy.toFixed(0)}</span>
+                              <Badge label={g.label} size={18} />
+                            </span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <table className="summary counts">
+              <tbody>
+                {LABELS.map((l) => (
+                  <tr key={l} className={review.counts.w[l] || review.counts.b[l] ? '' : 'empty'}>
+                    <td>
+                      <span className="summary-label">
+                        <Badge label={l} size={18} />
+                        {LABEL_TEXT[l].name}
+                      </span>
+                    </td>
+                    <td className="r num">{review.counts.w[l] || ''}</td>
+                    <td className="r num">{review.counts.b[l] || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <>
             {retry ? (
@@ -515,7 +592,11 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
                     </div>
                     {current.note && <p className="coach-note">{current.note}</p>}
                     <div className="coach-foot">
-                      {spent !== null && <span className="dim num">{formatSpent(spent)} on the clock</span>}
+                      {current.bestLine && current.bestLine.length > 0 && current.bestUci !== current.uci && (
+                        <button className="btn coach-retry" onClick={() => showBestLine(current)} title="Step through it with the arrow keys">
+                          <IconNext /> Best line
+                        </button>
+                      )}
                       {currentTarget >= 0 && (
                         <button className="btn coach-retry" onClick={() => startRetry(currentTarget)}>
                           <IconRetry /> Retry this move
@@ -592,13 +673,11 @@ function evalSide(m: ReviewedMove): 'white' | 'black' {
   return m.winPercentAfter >= 50 ? 'white' : 'black'
 }
 
-function formatSpent(seconds: number): string {
-  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`
-  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
-}
-
 /** Labels worth a mark in a move list; the quiet ones would only add noise. */
 const MARKED: Label[] = ['brilliant', 'great', 'inaccuracy', 'mistake', 'miss', 'blunder']
 
 /** Labels where naming the engine's choice adds nothing. */
 const QUIET_ENOUGH: Label[] = ['best', 'brilliant', 'great', 'excellent']
+
+const PHASES: PhaseName[] = ['opening', 'middlegame', 'endgame']
+const PHASE_TEXT: Record<PhaseName, string> = { opening: 'Opening', middlegame: 'Middlegame', endgame: 'Endgame' }

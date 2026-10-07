@@ -15,6 +15,46 @@ Open http://localhost:5173. `npm run dev` first copies Stockfish's 94 MB network
 
 Checks: `npx tsc --noEmit -p tsconfig.app.json` and `npm test`.
 
+## Insights and opening tree
+
+**Insights** (button on the start screen) loads a player's whole chess.com history once and caches it month by month in IndexedDB. Most of it needs no engine, so it covers every game:
+
+- results by opponent rating
+- how games ended
+- the phase they ended in
+- openings and how long you stayed in book
+- castling
+- moves by piece
+- clock use
+- results by weekday and hour
+
+The Engine tab covers accuracy over time, by move number and by piece, the mix of move labels, and tactics found or missed. It needs Stockfish, so it only covers games reviewed in the app.
+
+chess.com's API reports ratings *after* each game, so a win always shows a higher number. Comparing those directly makes beaten opponents look weaker than they were. `withPreGameRatings` in `src/insights/facts.ts` recovers the ratings going into each game.
+
+The **opening tree** shows every move order you've played as White or Black, with results from your side, out to move 15. Like the book, it matches by move order, so transpositions stay on separate branches.
+
+## Calibrating against chess.com
+
+```
+node scripts/calibrate-analyse.mjs <username> [shard] [shards]
+node scripts/calibrate-fit.mjs [--fit]
+```
+
+The first script analyses every game chess.com has an accuracy for, with the app's engine settings, and saves the evaluations to `calibration/` (gitignored). It can be stopped and resumed. The second compares our accuracy with chess.com's:
+
+- `--fit` grid-searches the accuracy constants, holding out a quarter of the games.
+- `--cv` does four-fold cross-validation, so every game is held out once.
+
+In dev, saved analyses are reused when you open a game, so calibrated games review instantly.
+
+The game-rating model has its own pair:
+
+```
+node scripts/rating-data.mjs   # samples chess.com players across the rating range; resumable
+node scripts/rating-fit.mjs    # prints the model JSON to paste into src/review/gameRating.ts
+```
+
 ## How a review works
 
 1. `src/chesscom` fetches the monthly archives from `api.chess.com/pub` (no key needed; it allows browser CORS).
@@ -23,7 +63,12 @@ Checks: `npx tsc --noEmit -p tsconfig.app.json` and `npm test`.
 
 **Engine settings.** One thread, depth 16, and at most 2 s per position. On the i5-1235U this was built on, 8 threads made the WASM build slower, not faster. A sharp middlegame had not reached depth 11 after 45 s on 8 threads, but reached depth 12 in 0.8 s on one. An 80-move game reviews in about 100 s.
 
-**Accuracy** uses Lichess's published formulas (win percent from centipawns, per-move accuracy, and a volatility-weighted plus harmonic mean per game), ported from lila and scalachess.
+**Accuracy** starts from Lichess's published formulas (win percent from centipawns, per-move accuracy, a volatility-weighted plus harmonic mean per game), ported from lila and scalachess. The constants were then refitted to chess.com's accuracy on 80 games chess.com had reviewed. That brought the average gap down from 8.0 to 6.3 points in four-fold cross-validation, with every fold improving. The biggest change is dropping the harmonic mean, which made one blunder sink a whole game's figure. Move labels still use the Lichess win-percent curve, because chess.com doesn't publish per-move labels to fit against.
+
+**Game rating** ("played like") comes in two figures, from `src/review/gameRating.ts`, fitted on 15,546 reviewed games from 216 chess.com players rated 100 to 3,400:
+
+- **Blended:** your rating going in, moved by how far your accuracy was above or below what's typical at that rating.
+- **Accuracy-only:** with an 80% range. It's honestly wide, because accuracy barely rises with rating: in bullet it's about 67 at 400 and 73.5 at 2400. Stronger players face stronger opponents in harder games.
 
 **Move labels** follow chess.com's published expected-points cutoffs: Best 0, Excellent up to 0.02, Good up to 0.05, Inaccuracy up to 0.10, Mistake up to 0.20, Blunder above that. Brilliant, Great and Miss are our own rules (a sound sacrifice, the only move that holds, failing to punish a mistake), so they will sometimes disagree with chess.com.
 
@@ -31,7 +76,7 @@ Checks: `npx tsc --noEmit -p tsconfig.app.json` and `npm test`.
 
 - chess.com scales expected points by player rating, and that curve isn't public. Ours ignores rating, so labels drift most in low-rated games.
 - Book moves are matched by move order, so a transposition into a named line isn't recognised.
-- Our accuracy hasn't been calibrated against chess.com's on a real sample yet. Games that were reviewed on chess.com show both numbers in the game list, along with the average gap.
+- Accuracy was calibrated on one player's games, which are mostly bullet around 1850. It may track chess.com less closely for very different players or slower time controls.
 
 ## Credits
 

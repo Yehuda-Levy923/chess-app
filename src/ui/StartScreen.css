@@ -37,8 +37,10 @@
 }
 
 .start-form input,
-.start-form select {
-  height: 34px;
+.start-form select,
+.search input,
+.search select {
+  height: 36px;
   padding: 0 10px;
   border: 1px solid var(--rule-strong);
   border-radius: 2px;
@@ -47,7 +49,9 @@
 }
 
 .start-form input:focus,
-.start-form select:focus {
+.start-form select:focus,
+.search input:focus,
+.search select:focus {
   outline: none;
   border-color: var(--ink-2);
 }
@@ -57,20 +61,22 @@
 }
 
 .start-settings {
-  height: 34px;
+  height: 36px;
 }
 
 .start-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 44px;
+  gap: 48px;
   align-items: start;
 }
+
+/* Preview */
 
 .start-preview {
   position: sticky;
   top: 24px;
-  margin-top: 28px;
+  margin-top: 30px;
 }
 
 .preview-text {
@@ -91,22 +97,138 @@
 .preview-open {
   margin-top: 14px;
   width: 100%;
-  height: 40px;
+  height: 42px;
 }
 
-.start-intro {
-  padding: 26px 0 4px;
+/* First visit */
+
+.start-empty {
+  padding: 40px 0 0;
+  max-width: 560px;
 }
 
-.start-intro h2 {
-  margin: 0 0 4px;
+.start-empty h2 {
+  margin: 0 0 10px;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 600;
+  line-height: 1.15;
 }
 
-.start-intro p {
+.start-empty p {
   margin: 0;
+  font-size: 15px;
+}
+
+/* Profile: who, how they're rated, how it's going */
+
+.profile {
+  padding: 28px 0 4px;
+}
+
+.profile h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.ratings {
+  display: flex;
+  /* Baseline of the first line, so the time-class labels sit level. */
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px 32px;
+}
+
+.rating {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rating-class {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.rating-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.rating-value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.rating.main .rating-value {
+  font-size: 32px;
+}
+
+.rating-change {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.sparkline {
+  align-self: center;
+  margin-left: 4px;
+  overflow: visible;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+/* Last results as a strip: filled won, half drawn, hollow lost. Shape, not colour. */
+.form {
+  display: flex;
+  gap: 3px;
+}
+
+.form-cell {
+  width: 10px;
+  height: 14px;
+  border-radius: 1px;
+  border: 1px solid var(--ink-2);
+}
+
+.form-cell.won {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.form-cell.drawn {
+  background: linear-gradient(to top, var(--ink-2) 50%, transparent 50%);
+}
+
+.calibration {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+/* Search */
+
+.search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.search-text {
+  flex: 1 1 220px;
+  min-width: 0;
 }
 
 .start-error {
@@ -118,8 +240,10 @@
   margin-top: 20px;
 }
 
+/* Games */
+
 .month h3 {
-  margin: 30px 0 4px;
+  margin: 30px 0 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink-2);
@@ -127,90 +251,147 @@
 
 .month-empty {
   color: var(--ink-3);
-  margin: 0;
+  margin: 6px 0 0;
+}
+
+.game-head,
+.game {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 76px 52px 52px;
+  column-gap: 14px;
+  align-items: center;
+}
+
+.game-head {
+  padding: 0 10px 4px;
+  border-bottom: 1px solid var(--rule-strong);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.game-head span:first-child {
+  grid-column: 4;
+  text-align: right;
+}
+
+.game-head span:last-child {
+  grid-column: 5;
+  text-align: right;
 }
 
 .games {
-  width: 100%;
-  border-collapse: collapse;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-.games th {
-  text-align: left;
-  font-weight: 400;
-  font-size: 12px;
-  color: var(--ink-3);
-  padding: 6px 10px 6px 0;
-  border-bottom: 1px solid var(--rule-strong);
-}
-
-.games td {
-  height: 40px;
-  padding: 0 10px 0 0;
+.game {
+  padding: 8px 10px;
   border-bottom: 1px solid var(--rule);
-  white-space: nowrap;
-}
-
-.games td:first-child,
-.games th:first-child {
-  padding-left: 10px;
-}
-
-.games tbody tr {
   cursor: pointer;
   transition: background-color 100ms;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 81px;
 }
 
-.games tbody tr:hover,
-.games tbody tr.previewed,
-.games tbody tr:focus-visible {
+.game:hover,
+.game.previewed,
+.game:focus-visible {
   background: var(--select);
   outline: none;
 }
 
-.games .r {
-  text-align: right;
+.game-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.games .result {
-  width: 64px;
+.game-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.game-line .result {
   font-weight: 600;
 }
 
-.games .result.drawn {
+.game-line .result.drawn {
   color: var(--ink-2);
-  font-weight: 400;
 }
 
-.games .result.lost {
+.game-line .result.lost {
   color: var(--ink-3);
   font-weight: 400;
 }
 
-.games .ours {
+.game-vs {
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-opp {
+  color: var(--ink);
   font-weight: 600;
 }
 
-.side-dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 8px;
-  border-radius: 1px;
-  border: 1px solid var(--rule-strong);
-  vertical-align: 0;
+.game-sub {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.side-dot.white {
-  background: #f4f1ea;
+.game-when {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.35;
 }
 
-.side-dot.black {
-  background: #1b1a18;
+.game-acc {
+  text-align: right;
+  color: var(--ink-2);
+}
+
+.game-acc.ours {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .older {
   margin-top: 20px;
+}
+
+/* Mini board thumbnail. Boards are physical objects, so a touch more rounding. */
+.miniboard {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-sunk);
+}
+
+.miniboard-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.miniboard-piece {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
 }
 
 @media (max-width: 960px) {
@@ -234,8 +415,25 @@
     width: 100%;
   }
 
-  .games th:nth-child(3),
-  .games td:nth-child(3) {
+  .game-head,
+  .game {
+    grid-template-columns: 44px minmax(0, 1fr) 46px 46px;
+  }
+
+  .game-when {
     display: none;
+  }
+
+  .game-head span:first-child {
+    grid-column: 3;
+  }
+
+  .game-head span:last-child {
+    grid-column: 4;
+  }
+
+  .miniboard {
+    width: 44px;
+    height: 44px;
   }
 }

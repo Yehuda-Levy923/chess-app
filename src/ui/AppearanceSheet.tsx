@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { BOARDS, PIECE_SETS, THEMES, useAppearance, type Appearance, type BoardDef } from './appearance'
+import { BOARDS, boardById, PIECE_SETS, THEMES, useAppearance, type Appearance, type BoardDef } from './appearance'
 import { GameBoard } from './GameBoard'
 import './AppearanceSheet.css'
 
@@ -22,6 +22,8 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
   const { appearance, setAppearance } = useAppearance()
   const closeRef = useRef<HTMLButtonElement>(null)
   const set = (patch: Partial<Appearance>) => setAppearance({ ...appearance, ...patch })
+  // Piece swatches sit on the chosen board's light square, so black sets stay visible on dark themes.
+  const currentBoard = boardById(appearance.board)
 
   useEffect(() => {
     closeRef.current?.focus()
@@ -51,7 +53,7 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
           <div className="choice-grid pieces">
             {PIECE_SETS.map((p) => (
               <button key={p.id} className={`choice ${appearance.pieces === p.id ? 'on' : ''}`} onClick={() => set({ pieces: p.id })} aria-pressed={appearance.pieces === p.id}>
-                <span className="choice-art piece-art">
+                <span className="choice-art piece-art" style={{ background: currentBoard.light }}>
                   {(['wN', 'bN'] as const).map((c) => (
                     <img key={c} src={p.src(c)} alt="" crossOrigin={p.crossOrigin ? 'anonymous' : undefined} draggable={false} />
                   ))}

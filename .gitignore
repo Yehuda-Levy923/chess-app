@@ -25,3 +25,6 @@ dist-ssr
 
 # copied from node_modules by scripts/copy-stockfish.mjs
 public/stockfish/
+
+# calibration runs: your game data and engine output (scripts/calibrate-*.mjs)
+calibration/

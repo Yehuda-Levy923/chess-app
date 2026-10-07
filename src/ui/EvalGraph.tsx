@@ -3,13 +3,19 @@ import { formatScore } from '../review/format'
 import type { Review } from '../review/types'
 import { LABEL_TEXT, toneOf } from './labels'
 
-type Props = { review: Review; ply: number; onPly: (ply: number) => void }
+type Props = {
+  review: Review
+  ply: number
+  onPly: (ply: number) => void
+  /** Move indexes where the middlegame and endgame start, drawn as dividers */
+  phases?: { middlegame: number | null; endgame: number | null }
+}
 
 const H = 96
 const PAD_Y = 4
 
 /** White's winning chances across the game. The light area is White's share. */
-export function EvalGraph({ review, ply, onPly }: Props) {
+export function EvalGraph({ review, ply, onPly, phases }: Props) {
   const ref = useRef<SVGSVGElement>(null)
   const [hover, setHover] = useState<number | null>(null)
   const dragging = useRef(false)
@@ -62,6 +68,17 @@ export function EvalGraph({ review, ply, onPly }: Props) {
           <line x1={x(shown)} x2={x(shown)} y1={0} y2={H} stroke="#fff" strokeOpacity={0.5} strokeWidth={1} vectorEffect="non-scaling-stroke" style={{ mixBlendMode: 'difference' }} />
         )}
       </svg>
+      {phases && (
+        <div className="graph-phases" aria-hidden>
+          {(['middlegame', 'endgame'] as const).map((ph) =>
+            phases[ph] === null || phases[ph] === 0 ? null : (
+              <span key={ph} className="graph-phase" style={{ left: `${(x(phases[ph]!) / W) * 100}%` }}>
+                {ph === 'middlegame' ? 'Middlegame' : 'Endgame'}
+              </span>
+            ),
+          )}
+        </div>
+      )}
       {/* Markers live outside the stretched SVG so they stay round. */}
       <div className="graph-marks" aria-hidden>
         {review.moves.map((m, i) => {

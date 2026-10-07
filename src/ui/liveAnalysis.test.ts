@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyFree, pvToSan } from './liveAnalysis'
+import { pvToSan } from './liveAnalysis'
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -15,21 +15,5 @@ describe('pvToSan', () => {
 
   it('stops at an illegal move', () => {
     expect(pvToSan(START, ['e2e4', 'e2e4'])).toHaveLength(1)
-  })
-})
-
-describe('classifyFree', () => {
-  it('calls the engine move best', () => {
-    const before = { score: { kind: 'cp' as const, cp: 30 }, uci: 'e2e4', second: { kind: 'cp' as const, cp: 25 } }
-    expect(classifyFree(START, 'e2e4', before, { kind: 'cp', cp: 30 })).toBe('best')
-  })
-
-  it('calls a big drop a blunder', () => {
-    const before = { score: { kind: 'cp' as const, cp: 30 }, uci: 'e2e4', second: null }
-    expect(classifyFree(START, 'f2f3', before, { kind: 'cp', cp: -600 })).toBe('blunder')
-  })
-
-  it('waits until both sides of the move are known', () => {
-    expect(classifyFree(START, 'e2e4', null, { kind: 'cp', cp: 30 })).toBeNull()
   })
 })

@@ -17,14 +17,30 @@ export const PIECE_NAME: Record<PieceSymbol, string> = {
  * legal piece and free to stop. Uses legal moves, so pins and x-rays are handled.
  */
 export function see(chess: Chess, square: Square): number {
-  const captures = chess.moves({ verbose: true }).filter((m) => m.to === square && m.captured)
-  if (captures.length === 0) return 0
-  const cheapest = captures.reduce((a, b) => (PIECE_VALUE[b.piece] < PIECE_VALUE[a.piece] ? b : a))
-  const gained = PIECE_VALUE[cheapest.captured!]
-  chess.move(cheapest)
-  const answer = see(chess, square)
-  chess.undo()
-  return Math.max(0, gained - answer)
+  const target = chess.get(square)
+  if (!target || target.color === chess.turn()) return 0
+  // attackers() is cheap; full verbose move generation at every step was the
+  // bulk of a review's build time. A pinned attacker shows up here but its
+  // capture is illegal, so chess.move rejects it and the next one is tried.
+  const attackers = chess
+    .attackers(square, chess.turn())
+    .map((from) => ({ from, value: PIECE_VALUE[chess.get(from)!.type] }))
+    .sort((a, b) => a.value - b.value)
+  for (const { from } of attackers) {
+    let move
+    try {
+      move = chess.move({ from, to: square, promotion: 'q' })
+    } catch {
+      continue
+    }
+    // A capture that promotes also turns a pawn into a queen; without this the
+    // queen that gets recaptured counts as a full queen lost.
+    const promotion = move.promotion ? PIECE_VALUE[move.promotion] - PIECE_VALUE.p : 0
+    const answer = see(chess, square)
+    chess.undo()
+    return Math.max(0, PIECE_VALUE[target.type] + promotion - answer)
+  }
+  return 0
 }
 
 export type Hanging = { square: Square; piece: PieceSymbol; gain: number }
@@ -36,10 +52,12 @@ export type Hanging = { square: Square; piece: PieceSymbol; gain: number }
 export function mostHanging(fen: string, victim: Color): Hanging | null {
   const chess = new Chess(fen)
   if (chess.turn() === victim) return null
+  // Only attacked pieces can be lost, so skip the exchange search for the rest.
+  const attacker = chess.turn()
   let worst: Hanging | null = null
   for (const row of chess.board()) {
     for (const cell of row) {
-      if (!cell || cell.color !== victim || cell.type === 'k') continue
+      if (!cell || cell.color !== victim || cell.type === 'k' || !chess.isAttacked(cell.square, attacker)) continue
       const gain = see(chess, cell.square)
       if (gain > 0 && (!worst || gain > worst.gain)) worst = { square: cell.square, piece: cell.type, gain }
     }

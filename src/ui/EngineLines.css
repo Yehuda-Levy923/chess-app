@@ -108,6 +108,8 @@
 .engine-eval.white {
   background: var(--graph-white);
   color: #1b1a18;
+  /* On the light themes the panel is nearly the same white. */
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
 }
 
 .engine-eval.black {

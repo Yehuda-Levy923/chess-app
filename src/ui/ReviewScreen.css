@@ -236,9 +236,17 @@
 }
 
 .acc-label {
-  padding: 0 8px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 8px 16px;
   font-size: 12px;
   color: var(--ink-3);
+}
+
+.acc-depth {
+  font-size: 11px;
+  opacity: 0.8;
 }
 
 .graph {
@@ -281,6 +289,25 @@
 }
 .mark-blunder {
   background: var(--tone-blunder);
+}
+
+.graph-phases {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.graph-phase {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding: 2px 0 0 4px;
+  border-left: 1px dashed rgb(255 255 255 / 0.55);
+  font-size: 10px;
+  line-height: 1;
+  color: rgb(255 255 255 / 0.7);
+  mix-blend-mode: difference;
+  white-space: nowrap;
 }
 
 .graph-tip {
@@ -486,6 +513,29 @@
   background: var(--select);
 }
 
+.moves .move {
+  justify-self: stretch;
+  margin-right: 6px;
+}
+
+.move-time {
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-3);
+}
+
+.move-time.long {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.move.current .move-time {
+  color: inherit;
+  opacity: 0.7;
+}
+
 .move.current {
   background: var(--ink);
   color: var(--surface);
@@ -530,6 +580,25 @@
 .summary td.r {
   font-weight: 600;
   font-size: 15px;
+}
+
+.report {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The phase rows carry the player names; the counts underneath share their columns. */
+.summary.counts {
+  margin-top: 4px;
+}
+
+.phase-grade {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .summary-label {
@@ -640,4 +709,26 @@
   .moves {
     max-height: 340px;
   }
+}
+
+.acc-rating {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.acc-rating .num {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.acc-rating-alone {
+  display: flex;
+  flex-direction: column;
+  white-space: nowrap;
+  line-height: 1.35;
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: help;
 }

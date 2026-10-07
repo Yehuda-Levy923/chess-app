@@ -49,13 +49,23 @@ export type ReviewedMove = {
   scoreAfter: Score
   bestUci: string | null
   bestSan: string | null
+  /** The engine's best line from the position before the move, UCI, up to 8 plies. Missing on version-1 reviews. */
+  bestLine?: string[]
+  /** Seconds left on the mover's clock after the move, from the PGN */
+  clock?: number | null
+  /** Seconds the mover spent on this move, increment included */
+  spent?: number | null
   scoreBest: Score | null
   note: string | null
   opening: string | null
 }
 
 export type Review = {
+  /** Missing on reviews cached before versioning; see REVIEW_VERSION */
+  version?: number
   gameId: string
+  /** The raw engine output, kept so new derived fields can be rebuilt without Stockfish */
+  analyses?: PositionAnalysis[]
   /** The depth that was asked for; reviews are cached under it */
   depth: number
   /** The shallowest depth any position actually reached */
@@ -65,4 +75,6 @@ export type Review = {
   counts: { w: Record<Label, number>; b: Record<Label, number> }
   opening: string | null
   initialWinPercent: number
+  /** Engine score of the starting position; missing before version 3 */
+  initialScore?: Score
 }
