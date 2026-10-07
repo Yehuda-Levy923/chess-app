@@ -65,10 +65,12 @@ export function ImportReviews({ hasReviews, onImported }: Props) {
 
   return (
     <>
-      {result && <p className="batch dim">{result}</p>}
+      {result && !(pending !== null && pending > 0) && <p className="batch dim">{result}</p>}
       {pending !== null && pending > 0 ? (
         <div className="batch import">
+          {/* The last result shares this line, so the button doesn't move between Stop and resume. */}
           <p>
+            {result && <span className="dim">{result} </span>}
             <span className="num">{pending}</span> downloaded review {pending === 1 ? 'file is' : 'files are'} ready.
           </p>
           <button className="btn btn-primary" onClick={start}>

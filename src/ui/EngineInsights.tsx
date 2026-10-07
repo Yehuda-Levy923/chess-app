@@ -100,7 +100,7 @@ export function EngineInsights({ games, totalGames, history, unreviewed, batch, 
     over: accuracyOverTime(games),
     byClock: accuracyByClock(games),
     afterResult: tilt(games, history),
-    byOpening: accuracyByOpening(games).slice(0, 8),
+    byOpening: accuracyByOpening(games, { minGames: 30 }),
     byGap: accuracyByRatingGap(games),
     quality: moveQuality(games),
     t: tactics(games),
@@ -109,6 +109,14 @@ export function EngineInsights({ games, totalGames, history, unreviewed, batch, 
   const withChessCom = stats.over.filter((p) => p.chessCom !== null)
   // Single games swing by 30 points; with hundreds of them the trend only shows as an average.
   const smooth = stats.over.length > 200
+  // Worst first by distance below your average in standard errors, not raw
+  // accuracy, so a 700-game opening outranks an 11-game fluke.
+  const worstOpenings = stats.byOpening
+    .flatMap((g) => (g.accuracy !== null && g.accuracySd ? [{ g, z: (g.accuracy - mean) / (g.accuracySd / Math.sqrt(g.games)) }] : []))
+    .filter((x) => x.z < 0)
+    .sort((a, b) => a.z - b.z)
+    .slice(0, 8)
+    .map((x) => x.g)
   const facts = new Map(games.map((g) => [g.facts.id, g.facts]))
   const drill = (title: string, ids: string[]) => onDrill({ title, games: ids.flatMap((id) => facts.get(id) ?? []) })
 
@@ -165,10 +173,10 @@ export function EngineInsights({ games, totalGames, history, unreviewed, batch, 
 
         <div className="insights-col">
           <h2>Openings you play least accurately</h2>
-          {stats.byOpening.length ? (
-            <GroupRows groups={stats.byOpening} mean={mean} onPick={(g) => drill(`${g.label}, reviewed games`, g.gameIds)} />
+          {worstOpenings.length ? (
+            <GroupRows groups={worstOpenings} mean={mean} onPick={(g) => drill(`${g.label}, reviewed games`, g.gameIds)} />
           ) : (
-            <p className="dim">Needs at least 10 reviewed games in an opening.</p>
+            <p className="dim">No opening with 30 or more reviewed games is below your average accuracy.</p>
           )}
 
           <h2>Against stronger and weaker opponents</h2>

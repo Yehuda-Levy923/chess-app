@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { GameFacts } from '../insights/facts'
 import { ratingSeries } from '../insights/stats'
 import { DivergingBars, LineChart, PerfBar } from './charts'
@@ -41,6 +42,21 @@ export function InsightsSummary({ games, history, periodDays, ratingClass, onDri
     })
 
   const months = derived(games, 'months', () => byMonth(games).slice(-18))
+
+  /**
+   * For the clock finding, how many of its losses were on time. Engine reviews
+   * show moves in time trouble aren't much worse, so the points go mostly to the flag.
+   */
+  const detailFor = (f: RankedFinding): ReactNode => {
+    if (f.kind !== 'clock') return null
+    const losses = games.filter((g) => f.ids.has(g.id) && g.outcome === 'lost')
+    const onTime = losses.filter((g) => g.how === 'timeout').length
+    return losses.length ? (
+      <>
+        <span className="num">{onTime.toLocaleString()}</span> of its <span className="num">{losses.length.toLocaleString()}</span> losses were on time.
+      </>
+    ) : null
+  }
   const peak = series.reduce<{ t: number; rating: number } | null>((best, p) => (!best || p.rating > best.rating ? p : best), null)
 
   return (
@@ -107,7 +123,7 @@ export function InsightsSummary({ games, history, periodDays, ratingClass, onDri
           ) : (
             <ol className="findings">
               {clear.map((f) => (
-                <FindingRow key={f.id} f={f} onDrill={() => drillFinding(f)} />
+                <FindingRow key={f.id} f={f} onDrill={() => drillFinding(f)} extra={detailFor(f)} />
               ))}
             </ol>
           )}
@@ -116,7 +132,7 @@ export function InsightsSummary({ games, history, periodDays, ratingClass, onDri
               <h3 className="sum-sub">Possible, could be chance</h3>
               <ol className="findings quiet">
                 {possible.map((f) => (
-                  <FindingRow key={f.id} f={f} onDrill={() => drillFinding(f)} />
+                  <FindingRow key={f.id} f={f} onDrill={() => drillFinding(f)} extra={detailFor(f)} />
                 ))}
               </ol>
             </>
@@ -128,7 +144,7 @@ export function InsightsSummary({ games, history, periodDays, ratingClass, onDri
           ) : (
             <ol className="findings">
               {strengths.map((f) => (
-                <FindingRow key={f.id} f={f} onDrill={() => drillFinding(f)} />
+                <FindingRow key={f.id} f={f} onDrill={() => drillFinding(f)} extra={detailFor(f)} />
               ))}
             </ol>
           )}
@@ -198,7 +214,7 @@ export function InsightsSummary({ games, history, periodDays, ratingClass, onDri
   )
 }
 
-function FindingRow({ f, onDrill }: { f: RankedFinding; onDrill: () => void }) {
+function FindingRow({ f, onDrill, extra }: { f: RankedFinding; onDrill: () => void; extra?: ReactNode }) {
   return (
     <li className="finding">
       <span className="finding-cost">
@@ -209,6 +225,7 @@ function FindingRow({ f, onDrill }: { f: RankedFinding; onDrill: () => void }) {
         <span className="finding-title">{f.title}</span>
         <span className="finding-text">
           You score <span className="num">{pct(f.actual)}</span> where your ratings predicted <span className="num">{pct(f.expected)}</span>, over <span className="num">{f.games.toLocaleString()}</span> games.
+          {extra && <> {extra}</>}
         </span>
         <PerfBar actual={f.actual} expected={f.expected} />
       </span>
