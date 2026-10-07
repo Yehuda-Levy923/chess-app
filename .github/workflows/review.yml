@@ -1,0 +1,86 @@
+# Reviews chess.com games with native Stockfish 19 on GitHub's runners, using
+# the app's own review code, and keeps the results as a downloadable artifact.
+# `npm run pull-reviews` downloads them; Insights imports them.
+#
+# Run it by hand for a full history (split across parallel jobs). The daily
+# schedule reviews only games from the last three days.
+name: Review games
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: chess.com username
+        default: yehuda_levy
+        required: true
+      since_days:
+        description: Only games that ended in the last N days (0 for every game)
+        default: '0'
+      shards:
+        description: Parallel jobs to split the games across
+        default: '16'
+      limit:
+        description: At most this many games per job, for test runs (0 for no limit)
+        default: '0'
+  schedule:
+    - cron: '23 5 * * *'
+
+permissions:
+  contents: read
+
+# A daily run waits for a long manual run instead of racing it.
+concurrency:
+  group: review-games
+
+env:
+  USERNAME: ${{ inputs.username || 'yehuda_levy' }}
+  SINCE_DAYS: ${{ inputs.since_days || '3' }}
+  SHARDS: ${{ inputs.shards || '1' }}
+  LIMIT: ${{ inputs.limit || '0' }}
+  STOCKFISH_URL: https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-x86-64-universal.tar.gz
+  STOCKFISH_SHA256: 9defc0d4e55d49c65a6d042f3e571a39fcea499ade6dbe741b53b8c65e03611f
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.list.outputs.shards }}
+    steps:
+      - id: list
+        run: echo "shards=[$(seq -s, 0 $((SHARDS - 1)))]" >> "$GITHUB_OUTPUT"
+
+  review:
+    needs: plan
+    runs-on: ubuntu-latest
+    # Jobs on GitHub-hosted runners are stopped at six hours; the script stops
+    # taking new games well before that so what it finished still gets uploaded.
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Stockfish 19
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/sf.tar.gz" "$STOCKFISH_URL"
+          echo "$STOCKFISH_SHA256  $RUNNER_TEMP/sf.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/sf.tar.gz" -C "$RUNNER_TEMP"
+          echo "ENGINE=$RUNNER_TEMP/stockfish/stockfish-linux-x86-64-universal" >> "$GITHUB_ENV"
+      - name: Review
+        run: >
+          node scripts/ci-review.mjs --user "$USERNAME" --engine "$ENGINE"
+          --shard ${{ matrix.shard }} --shards "$SHARDS" --since-days "$SINCE_DAYS"
+          --limit "$LIMIT" --max-minutes 330 --out ci-out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: reviews-shard${{ matrix.shard }}
+          path: ci-out/
+          retention-days: 90
+          # The reviews are gzipped already.
+          compression-level: 0

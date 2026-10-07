@@ -28,3 +28,8 @@ public/stockfish/
 
 # calibration runs: your game data and engine output (scripts/calibrate-*.mjs)
 calibration/
+
+# reviews from the Review games workflow: ci-out/ is written by scripts/ci-review.mjs,
+# ci-reviews/ by scripts/pull-reviews.mjs
+ci-out/
+ci-reviews/
