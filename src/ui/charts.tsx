@@ -19,25 +19,61 @@ type LineSeries = { id: string; name: string; points: Point[]; dashed?: boolean 
 
 const W = 1000
 
-/** Line chart with a crosshair tooltip. Two series at most, told apart by solid vs dashed. */
-export function LineChart({ series, height = 160, yLabel, yDomain }: { series: LineSeries[]; height?: number; yLabel: string; yDomain?: [number, number] }) {
+/**
+ * Line chart with a crosshair tooltip. Two series at most, told apart by solid
+ * vs dashed. With `zoomable`, dragging across the plot zooms to that span;
+ * double-click or "Show all" goes back.
+ */
+export function LineChart({
+  series,
+  height = 160,
+  yLabel,
+  yDomain,
+  zoomable = false,
+  formatX,
+  marks = [],
+}: {
+  series: LineSeries[]
+  height?: number
+  yLabel: string
+  yDomain?: [number, number]
+  zoomable?: boolean
+  /** Labels the start and end of the visible span, e.g. as dates */
+  formatX?: (x: number) => string
+  /** Labelled points worth calling out, e.g. the peak */
+  marks?: { x: number; y: number; label: string }[]
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null)
-  const all = series.flatMap((s) => s.points)
-  if (all.length < 2) return <p className="dim chart-empty">Not enough games to draw this yet.</p>
+  const [zoom, setZoom] = useState<[number, number] | null>(null)
+  const [drag, setDrag] = useState<[number, number] | null>(null)
+
+  const inView = (x: number) => !zoom || (x >= zoom[0] && x <= zoom[1])
+  const visible = series.map((s) => ({ ...s, points: s.points.filter((p) => inView(p.x)) }))
+  const all = visible.flatMap((s) => s.points)
+  if (series.flatMap((s) => s.points).length < 2) return <p className="dim chart-empty">Not enough games to draw this yet.</p>
 
   const xs = all.map((p) => p.x)
   const ys = all.map((p) => p.y)
-  const [x0, x1] = [Math.min(...xs), Math.max(...xs)]
+  const [x0, x1] = zoom ?? [Math.min(...xs), Math.max(...xs)]
   const pad = (Math.max(...ys) - Math.min(...ys)) * 0.08 || 1
   const [y0, y1] = yDomain ?? [Math.min(...ys) - pad, Math.max(...ys) + pad]
   const H = height
   const sx = (x: number) => (x1 === x0 ? W / 2 : ((x - x0) / (x1 - x0)) * W)
   const sy = (y: number) => 6 + (1 - (y - y0) / (y1 - y0)) * (H - 12)
   const ticks = [y0, (y0 + y1) / 2, y1]
+  /** Plot x (0..W) back to a data x */
+  const dx = (px: number) => x0 + (px / W) * (x1 - x0)
+  const plotX = (clientX: number) => {
+    const r = ref.current!.getBoundingClientRect()
+    return Math.min(W, Math.max(0, ((clientX - r.left) / r.width) * W))
+  }
 
-  const primary = series[0].points
-  const nearest = hover === null ? null : primary.reduce((best, p) => (Math.abs(sx(p.x) - hover) < Math.abs(sx(best.x) - hover) ? p : best), primary[0])
+  const primary = visible[0].points
+  const nearest =
+    hover === null || drag || primary.length === 0
+      ? null
+      : primary.reduce((best, p) => (Math.abs(sx(p.x) - hover) < Math.abs(sx(best.x) - hover) ? p : best), primary[0])
 
   return (
     <div className="linechart">
@@ -49,19 +85,35 @@ export function LineChart({ series, height = 160, yLabel, yDomain }: { series: L
         ))}
       </div>
       <div
-        className="linechart-plot"
+        className={`linechart-plot ${zoomable ? 'zoomable' : ''}`}
         ref={ref}
-        onPointerMove={(e) => {
-          const r = ref.current!.getBoundingClientRect()
-          setHover(((e.clientX - r.left) / r.width) * W)
+        onPointerDown={(e) => {
+          if (!zoomable) return
+          e.currentTarget.setPointerCapture(e.pointerId)
+          const x = plotX(e.clientX)
+          setDrag([x, x])
         }}
-        onPointerLeave={() => setHover(null)}
+        onPointerMove={(e) => {
+          const x = plotX(e.clientX)
+          setHover(x)
+          if (drag) setDrag([drag[0], x])
+        }}
+        onPointerUp={() => {
+          if (drag && Math.abs(drag[1] - drag[0]) > W * 0.02) {
+            const [a, b] = [dx(Math.min(...drag)), dx(Math.max(...drag))]
+            // Only zoom in on a span that still holds a couple of points.
+            if (primary.filter((p) => p.x >= a && p.x <= b).length >= 2) setZoom([a, b])
+          }
+          setDrag(null)
+        }}
+        onPointerLeave={() => !drag && setHover(null)}
+        onDoubleClick={() => setZoom(null)}
       >
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={yLabel} style={{ height: H }}>
           {ticks.map((t, i) => (
             <line key={i} x1={0} x2={W} y1={sy(t)} y2={sy(t)} className="chart-grid" vectorEffect="non-scaling-stroke" />
           ))}
-          {series.map((s) => (
+          {visible.map((s) => (
             <polyline
               key={s.id}
               points={s.points.map((p) => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ')}
@@ -69,8 +121,16 @@ export function LineChart({ series, height = 160, yLabel, yDomain }: { series: L
               vectorEffect="non-scaling-stroke"
             />
           ))}
+          {drag && <rect x={Math.min(...drag)} width={Math.abs(drag[1] - drag[0])} y={0} height={H} className="chart-brush" />}
           {nearest && <line x1={sx(nearest.x)} x2={sx(nearest.x)} y1={0} y2={H} className="chart-cross" vectorEffect="non-scaling-stroke" />}
         </svg>
+        {marks
+          .filter((m) => inView(m.x))
+          .map((m) => (
+            <span key={m.label} className="chart-mark" style={{ left: `${(sx(m.x) / W) * 100}%`, top: `${(sy(m.y) / H) * 100}%` }}>
+              <span className="chart-mark-label">{m.label}</span>
+            </span>
+          ))}
         {nearest && (
           <>
             <span className="chart-dot" style={{ left: `${(sx(nearest.x) / W) * 100}%`, top: `${(sy(nearest.y) / H) * 100}%` }} />
@@ -80,6 +140,20 @@ export function LineChart({ series, height = 160, yLabel, yDomain }: { series: L
           </>
         )}
       </div>
+      {(formatX || zoomable) && (
+        <div className="linechart-foot">
+          {formatX && <span className="num">{formatX(x0)}</span>}
+          {zoomable &&
+            (zoom ? (
+              <button className="btn btn-quiet chart-reset" onClick={() => setZoom(null)}>
+                Show all
+              </button>
+            ) : (
+              <span className="dim">Drag across the chart to zoom</span>
+            ))}
+          {formatX && <span className="num">{formatX(x1)}</span>}
+        </div>
+      )}
       {series.length > 1 && (
         <p className="chart-legend">
           {series.map((s) => (
@@ -125,6 +199,61 @@ export function BarChart({ bars, height = 120, format }: { bars: Bar[]; height?:
         <div className="chart-tip barchart-tip" style={{ left: `${((bars.indexOf(shown) + 0.5) / bars.length) * 100}%` }}>
           <strong>{shown.label}</strong> {format(shown.value)}
           <br />
+          {shown.tip}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Actual result as a filled bar against a tick where the ratings predicted it would be. */
+export function PerfBar({ actual, expected }: { actual: number; expected: number }) {
+  return (
+    <span className="perfbar" role="img" aria-label={`${Math.round(actual * 100)}% scored, ${Math.round(expected * 100)}% expected`}>
+      <span className="perfbar-fill" style={{ width: `${actual * 100}%` }} />
+      <span className="perfbar-expected" style={{ left: `${expected * 100}%` }} />
+    </span>
+  )
+}
+
+type Signed = { key: string; label: string; value: number; tip: ReactNode }
+
+/**
+ * Bars above or below a zero line, e.g. each month's score against what the
+ * ratings predicted. Hover for detail; click to see that bar's games.
+ */
+export function DivergingBars({ bars, height = 120, onPick }: { bars: Signed[]; height?: number; onPick?: (key: string) => void }) {
+  const [hover, setHover] = useState<string | null>(null)
+  const max = Math.max(...bars.map((b) => Math.abs(b.value)), 0.01)
+  const shown = bars.find((b) => b.key === hover)
+  const every = Math.max(1, Math.ceil(bars.length / 8))
+  return (
+    <div className="divbars" style={{ height: height + 20 }}>
+      <div className="divbars-plot" style={{ height }} onPointerLeave={() => setHover(null)}>
+        <span className="divbars-zero" />
+        {bars.map((b) => {
+          const h = (Math.abs(b.value) / max) * 50
+          return (
+            <button
+              key={b.key}
+              className={`divbars-col ${hover === b.key ? 'on' : ''}`}
+              onPointerEnter={() => setHover(b.key)}
+              onFocus={() => setHover(b.key)}
+              onClick={() => onPick?.(b.key)}
+              aria-label={`${b.label}: ${b.value >= 0 ? '+' : ''}${b.value.toFixed(1)}`}
+            >
+              <span className={`divbars-bar ${b.value < 0 ? 'neg' : 'pos'}`} style={b.value < 0 ? { top: '50%', height: `${h}%` } : { bottom: '50%', height: `${h}%` }} />
+            </button>
+          )
+        })}
+      </div>
+      <div className="divbars-labels" aria-hidden>
+        {bars.map((b, i) => (
+          <span key={b.key}>{i % every === 0 ? b.label : ''}</span>
+        ))}
+      </div>
+      {shown && (
+        <div className="chart-tip divbars-tip" style={{ left: `${((bars.indexOf(shown) + 0.5) / bars.length) * 100}%` }}>
           {shown.tip}
         </div>
       )}

@@ -1,4 +1,5 @@
 import { boardById, pieceSetById, useAppearance, type PieceCode } from './appearance'
+import './MiniBoard.css'
 
 // A static thumbnail of a position: the chosen board and pieces as plain
 // images. A full Chessboard per row would be far too heavy for a list of a

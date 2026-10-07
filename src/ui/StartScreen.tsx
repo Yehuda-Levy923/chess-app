@@ -5,8 +5,8 @@ import { loadHistory } from '../insights/history'
 import { getBook } from '../openings'
 import { bookDepth } from '../openings/book'
 import { movesFromPgn } from '../review/buildReview'
-import { allReviews } from '../review/cache'
-import type { Review } from '../review/types'
+import { allSummaries } from '../review/cache'
+import type { GameSummary } from '../review/summary'
 import { useAppearance } from './appearance'
 import { GameBoard } from './GameBoard'
 import { finalFen, moveCount, openingName, ratingsNow } from './gameSummary'
@@ -41,7 +41,7 @@ export function StartScreen({ username, depth, onUsername, onDepth, onOpen, onIn
   const [months, setMonths] = useState<Month[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [reviews, setReviews] = useState<Map<string, Review>>(new Map())
+  const [reviews, setReviews] = useState<Map<string, GameSummary>>(new Map())
   const [previewId, setPreviewId] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>(NO_FILTERS)
   const [shown, setShown] = useState(PAGE)
@@ -51,7 +51,7 @@ export function StartScreen({ username, depth, onUsername, onDepth, onOpen, onIn
   const searching = filters.text.trim() !== '' || filters.result !== 'all' || filters.time !== 'all' || filters.side !== 'all'
 
   useEffect(() => {
-    allReviews().then((all) => setReviews(new Map(all.map((r) => [r.gameId, r]))))
+    allSummaries().then((all) => setReviews(new Map(all.map((r) => [r.gameId, r]))))
   }, [])
 
   useEffect(() => {
@@ -468,7 +468,7 @@ function matchesFilters(f: GameFacts, filters: Filters): boolean {
   )
 }
 
-function calibration(games: ChessComGame[], reviews: Map<string, Review>, me: string) {
+function calibration(games: ChessComGame[], reviews: Map<string, GameSummary>, me: string) {
   const diffs: number[] = []
   for (const g of games) {
     const r = reviews.get(g.uuid)

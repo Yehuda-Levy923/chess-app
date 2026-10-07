@@ -470,10 +470,39 @@
 }
 
 .tree-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
   margin: 0 0 4px;
+}
+
+.tree-summary .dim {
+  grid-column: 1;
+  font-size: 13px;
+}
+
+.tree-games {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.tree-rows .delta {
+  color: var(--ink-3);
+}
+
+.tree-rows tr.few td {
+  color: var(--ink-3);
+}
+
+.tree-rows .delta.strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.tree-rows .bar-cell .perfbar {
+  margin-top: 0;
+  width: 90px;
 }
 
 .tree-opening {
@@ -501,13 +530,127 @@
   white-space: nowrap;
 }
 
-.tree-pick p {
-  margin: 0 0 12px;
+/* Openings: the list beside the tree */
+
+.openings {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
 }
 
-.tree-pick-buttons {
+.openings .tree {
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 28px;
+}
+
+.openings-head {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.openings-head .tree-side button {
+  white-space: nowrap;
+}
+
+.openings-head .tree-side {
+  margin: 0;
+}
+
+.openings-sort {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.openings-sort select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--surface-raised);
+  font-size: 13px;
+}
+
+.opening-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule-strong);
+}
+
+.opening-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px 52px 46px;
+  grid-template-rows: auto 3px;
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: baseline;
+  width: 100%;
+  padding: 8px 8px 7px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  text-align: left;
+  font-size: 13px;
+}
+
+.opening-row:hover {
+  background: var(--select);
+}
+
+.opening-row.on {
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+
+.opening-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.opening-games,
+.opening-score,
+.opening-delta {
+  text-align: right;
+}
+
+.opening-games {
+  color: var(--ink-2);
+}
+
+.opening-delta {
+  color: var(--ink-3);
+}
+
+.opening-delta.strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* How often it's played, as a hairline under the name */
+.opening-share {
+  grid-column: 1;
+  grid-row: 2;
+  display: block;
+  height: 3px;
+  background: var(--rule);
+}
+
+.opening-share span {
+  display: block;
+  height: 100%;
+  background: var(--ink-3);
 }
 
 /* Loading and errors */
@@ -551,4 +694,710 @@
   .itable .bar-cell {
     display: none;
   }
+}
+
+/* Zoomable line chart */
+
+.linechart-plot.zoomable {
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.chart-brush {
+  fill: var(--accent);
+  opacity: 0.14;
+}
+
+.linechart-foot {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 26px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.chart-reset {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.chart-mark {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: var(--surface-raised);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.chart-mark-label {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* Result against expectation */
+
+.perfbar {
+  position: relative;
+  display: block;
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 1px;
+  background: var(--rule);
+}
+
+.perfbar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.perfbar-expected {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+}
+
+/* Bars around zero */
+
+.divbars {
+  position: relative;
+}
+
+.divbars-plot {
+  position: relative;
+  display: flex;
+  gap: 3px;
+}
+
+.divbars-zero {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid var(--rule-strong);
+}
+
+.divbars-col {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.divbars-col:hover,
+.divbars-col.on {
+  background: var(--select);
+}
+
+.divbars-bar {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+/* Below expectation reads as the same series, just hollow. */
+.divbars-bar.neg {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.divbars-labels {
+  display: flex;
+  gap: 3px;
+  padding-top: 4px;
+}
+
+.divbars-labels span {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.divbars-tip {
+  bottom: auto;
+  top: -8px;
+  transform: translate(-50%, -100%);
+}
+
+/* Summary */
+
+.kpis {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 0 6px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.kpi {
+  flex: 1 1 140px;
+  padding: 12px 18px 12px 0;
+}
+
+.kpi + .kpi {
+  padding-left: 18px;
+  border-left: 1px solid var(--rule);
+}
+
+.kpi dt {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.kpi dd {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
+.kpi-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+button.kpi-value {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+}
+
+button.kpi-value:hover {
+  text-decoration-color: var(--ink-2);
+}
+
+.kpi-delta {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.kpis-caption {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0 0 10px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.sum-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 8px 48px;
+}
+
+.sum-main,
+.sum-side {
+  min-width: 0;
+}
+
+.sum-sub {
+  margin: 18px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.sum-none {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.findings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.finding {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.finding:first-child {
+  border-top: 1px solid var(--rule-strong);
+}
+
+.finding-cost {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.finding-cost .num {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.finding-unit {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.finding-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.finding-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.finding-text {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.finding-games {
+  height: 30px;
+  font-size: 13px;
+}
+
+.findings.quiet .finding {
+  padding: 10px 0;
+}
+
+.findings.quiet .finding-cost .num,
+.findings.quiet .finding-title {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.findings.quiet .perfbar {
+  display: none;
+}
+
+.sum-method {
+  margin-top: 22px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.sum-method summary {
+  cursor: pointer;
+  width: max-content;
+}
+
+.sum-method summary:hover {
+  color: var(--ink-2);
+}
+
+.sum-method p {
+  margin: 8px 0 0;
+  max-width: 62ch;
+  line-height: 1.5;
+}
+
+/* Games behind a number */
+
+.games-sheet {
+  width: min(500px, 100vw);
+}
+
+.drill-summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.drill-detail {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.drill-list {
+  list-style: none;
+  margin: 14px -22px 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.drill-game {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 22px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  text-align: left;
+}
+
+.drill-game:hover {
+  background: var(--select);
+}
+
+.drill-game .miniboard {
+  width: 48px;
+  height: 48px;
+}
+
+.drill-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drill-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.drill-result {
+  font-weight: 600;
+}
+
+.drill-result.drawn {
+  color: var(--ink-2);
+}
+
+.drill-result.lost {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.drill-vs {
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drill-vs strong {
+  color: var(--ink);
+}
+
+.drill-sub {
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drill-date {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.drill-more {
+  margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .sum-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kpi + .kpi {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+/* Rows judged against expectation */
+
+.perf-rows tbody tr {
+  cursor: pointer;
+}
+
+.perf-rows tbody tr:hover,
+.perf-rows tbody tr:focus-visible {
+  background: var(--select);
+  outline: none;
+}
+
+.perf-rows tr.few td {
+  color: var(--ink-3);
+}
+
+.perf-rows .delta {
+  color: var(--ink-3);
+}
+
+.perf-rows .delta.strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.perf-rows .bar-cell {
+  width: 34%;
+}
+
+.perf-rows .bar-cell .perfbar {
+  margin-top: 0;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+}
+
+.link-button:hover {
+  text-decoration-color: var(--ink-2);
+}
+
+/* How games end: losses to the left, wins to the right */
+
+.endings {
+  display: flex;
+  flex-direction: column;
+}
+
+.endings-head,
+.endings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.endings-head {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.endings-head span:first-child {
+  text-align: right;
+}
+
+.endings-row {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.endings-label {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.endings-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.endings-side.lost {
+  justify-content: flex-end;
+}
+
+.endings-side:hover .endings-bar {
+  opacity: 0.8;
+}
+
+.endings-bar {
+  display: block;
+  height: 14px;
+  min-width: 1px;
+  border-radius: 1px;
+}
+
+.endings-side.won .endings-bar {
+  background: var(--accent);
+}
+
+/* Losses are the same series drawn hollow, not a second colour. */
+.endings-side.lost .endings-bar {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.endings-draws {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.clock-flags {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* Activity calendar */
+
+.activity > h2:first-child {
+  margin-top: 0;
+}
+
+.calendar {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.calendar-months,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(53, 17px);
+  column-gap: 3px;
+}
+
+.calendar-months {
+  height: 16px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.calendar-months span {
+  white-space: nowrap;
+}
+
+.calendar-grid {
+  position: relative;
+  grid-template-rows: repeat(7, 17px);
+  row-gap: 3px;
+  width: max-content;
+}
+
+.calendar-day {
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: var(--rule);
+  cursor: pointer;
+}
+
+.calendar-day:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.calendar-day.l1 {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.calendar-day.l2 {
+  background: color-mix(in srgb, var(--accent) 52%, transparent);
+}
+
+.calendar-day.l3 {
+  background: color-mix(in srgb, var(--accent) 76%, transparent);
+}
+
+.calendar-day.l4 {
+  background: var(--accent);
+}
+
+.calendar-day:not(:disabled):hover {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 0;
+}
+
+.calendar-tip {
+  transform: translate(-50%, calc(-100% - 6px));
+  bottom: auto;
+}
+
+.calendar-foot {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+/* Engine tab */
+
+.engine-tab > .note:first-child {
+  margin-top: 0;
+}
+
+.perf-rows.static tbody tr {
+  cursor: default;
+}
+
+.perf-rows.static tbody tr:hover {
+  background: none;
+}
+
+.quality .label-cell {
+  white-space: nowrap;
+}
+
+.quality .badge-space {
+  display: inline-block;
+  width: 15px;
+}
+
+.quality .bar-cell {
+  width: 40%;
+}
+
+.batch.import {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.batch.import p {
+  margin: 0;
+}
+
+.batch code {
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: var(--surface-sunk);
+  font-size: 12.5px;
+}
+
+.perf-rows td.strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.insights-body .caption {
+  margin: -2px 0 8px;
+  font-size: 12px;
 }

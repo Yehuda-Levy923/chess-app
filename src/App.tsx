@@ -48,11 +48,15 @@ export default function App() {
 
   return (
     <AppearanceContext.Provider value={ctx}>
-      {game ? (
-        <ReviewScreen game={game} username={username} depth={depth} onBack={() => setGame(null)} />
-      ) : insightsOpen && username ? (
-        <InsightsScreen username={username} onBack={() => setInsightsOpen(false)} />
-      ) : (
+      {game && <ReviewScreen game={game} username={username} depth={depth} onBack={() => setGame(null)} />}
+      {/* Kept mounted (just hidden) while a game from it is reviewed, so Back
+          returns to the same tab and filters without re-reading the history. */}
+      {insightsOpen && username && (
+        <div hidden={!!game}>
+          <InsightsScreen username={username} onBack={() => setInsightsOpen(false)} onOpen={setGame} />
+        </div>
+      )}
+      {!game && !(insightsOpen && username) && (
         <StartScreen
           username={username}
           depth={depth}
