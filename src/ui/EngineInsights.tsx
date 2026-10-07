@@ -107,6 +107,8 @@ export function EngineInsights({ games, totalGames, history, unreviewed, batch, 
   }))
   const mean = stats.over.reduce((s, p) => s + p.ours, 0) / Math.max(1, stats.over.length)
   const withChessCom = stats.over.filter((p) => p.chessCom !== null)
+  // Single games swing by 30 points; with hundreds of them the trend only shows as an average.
+  const smooth = stats.over.length > 200
   const facts = new Map(games.map((g) => [g.facts.id, g.facts]))
   const drill = (title: string, ids: string[]) => onDrill({ title, games: ids.flatMap((id) => facts.get(id) ?? []) })
 
@@ -121,16 +123,31 @@ export function EngineInsights({ games, totalGames, history, unreviewed, batch, 
 
       <div className="insights-grid">
         <div className="insights-col">
-          <h2>Accuracy over time</h2>
+          <h2>{smooth ? `Accuracy over time, ${WINDOW}-game average` : 'Accuracy over time'}</h2>
           <LineChart
             zoomable
             yLabel="Accuracy per reviewed game"
             yDomain={[0, 100]}
             formatX={(t) => new Date(t * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
             series={[
-              { id: 'ours', name: 'This app', points: stats.over.map((p) => ({ x: p.t, y: p.ours, tip: tipText(p) })) },
-              ...(withChessCom.length
-                ? [{ id: 'cc', name: 'chess.com', dashed: true, points: withChessCom.map((p) => ({ x: p.t, y: p.chessCom!, tip: tipText(p) })) }]
+              {
+                id: 'ours',
+                name: 'This app',
+                points: smooth
+                  ? rolling(stats.over.map((p) => ({ t: p.t, v: p.ours }))).map((p) => ({ x: p.t, y: p.v, tip: avgTip(p) }))
+                  : stats.over.map((p) => ({ x: p.t, y: p.ours, tip: tipText(p) })),
+              },
+              ...(withChessCom.length >= 2
+                ? [
+                    {
+                      id: 'cc',
+                      name: 'chess.com',
+                      dashed: true,
+                      points: smooth
+                        ? rolling(withChessCom.map((p) => ({ t: p.t, v: p.chessCom! }))).map((p) => ({ x: p.t, y: p.v, tip: avgTip(p) }))
+                        : withChessCom.map((p) => ({ x: p.t, y: p.chessCom!, tip: tipText(p) })),
+                    },
+                  ]
                 : []),
             ]}
           />
@@ -308,4 +325,28 @@ function tipText(p: { t: number; ours: number; chessCom: number | null }) {
 function clears(accuracy: number | null, sd: number | null, n: number, mean: number): boolean {
   if (accuracy === null || sd === null || n < 10 || sd === 0) return false
   return Math.abs(accuracy - mean) / (sd / Math.sqrt(n)) >= 2
+}
+
+const WINDOW = 50
+
+/** Trailing average over WINDOW games, thinned to about 400 points for drawing. */
+function rolling(points: { t: number; v: number }[]): { t: number; v: number; n: number }[] {
+  const sorted = [...points].sort((a, b) => a.t - b.t)
+  const out: { t: number; v: number; n: number }[] = []
+  let sum = 0
+  sorted.forEach((p, i) => {
+    sum += p.v
+    if (i >= WINDOW) sum -= sorted[i - WINDOW].v
+    if (i >= WINDOW - 1) out.push({ t: p.t, v: sum / WINDOW, n: WINDOW })
+  })
+  const step = Math.max(1, Math.floor(out.length / 400))
+  return out.filter((_, i) => i % step === 0 || i === out.length - 1)
+}
+
+function avgTip(p: { t: number; v: number }) {
+  return (
+    <>
+      <span className="num">{p.v.toFixed(1)}</span> <span className="dim">average of the {WINDOW} games to {formatDate(p.t)}</span>
+    </>
+  )
 }
