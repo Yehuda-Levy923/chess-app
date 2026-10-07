@@ -3,7 +3,8 @@ import type { ChessComGame } from '../chesscom/api'
 import { buildBook } from '../openings/book'
 import { buildReview, movesFromPgn, terminalScore } from '../review/buildReview'
 import type { PositionAnalysis, Score } from '../review/types'
-import { tactics, moveQuality, accuracyByMove } from './engineStats'
+import { summarize } from '../review/summary'
+import { accuracyByClock, accuracyByMove, accuracyByOpening, accuracyByRatingGap, moveQuality, tactics, tilt, type ReviewedGame } from './engineStats'
 import { factsOf, phaseOfFinalPosition, withPreGameRatings, type GameFacts } from './facts'
 import { byRatingGap, castling, clockUse, howGamesEnd, openings, overall, pieceShare, score } from './stats'
 import { branches, buildTree, nodeAt } from './tree'
@@ -195,17 +196,75 @@ describe('engine stats', () => {
     { fen: fens[7], depth: 16, lines: [{ score: terminalScore(fens[7])!, pv: [] }] },
   ]
   const review = buildReview('g', moves, analyses, book)
+  const summary = summarize(review)
+  const as = (side: GameFacts['side'], o: Partial<GameFacts> = {}): ReviewedGame => ({ summary, facts: facts({ side, ...o }), chessComAccuracy: null })
 
   it('counts a mate the player found, from White', () => {
-    const t = tactics([{ review, side: 'white', endTime: 0, chessComAccuracy: null }])
+    const t = tactics([as('white')])
     expect(t.matesFound).toBe(1)
     expect(t.matesMissed).toBe(0)
   })
 
   it('splits move quality and accuracy by the player side only', () => {
-    const q = moveQuality([{ review, side: 'black', endTime: 0, chessComAccuracy: null }])
+    const q = moveQuality([as('black')])
     expect(q.get('blunder')).toBeCloseTo(1 / 3)
-    const byMove = accuracyByMove([{ review, side: 'black', endTime: 0, chessComAccuracy: null }])
+    const byMove = accuracyByMove([as('black')])
     expect(byMove[0].moves).toBe(3)
+  })
+
+  it('keeps the summary in step with the review it came from', () => {
+    expect(summary.labels).toHaveLength(review.moves.length)
+    expect(summary.accuracy).toEqual(review.accuracy)
+    expect(summary.moveAccuracy[6]).toBeCloseTo(review.moves[6].accuracy, 1)
+    expect(summary.winPercent).toHaveLength(review.moves.length + 1)
+    expect(summarize(review, { tactics: [7, 7, 7, 7, 7, 7, 7] }).tactics).toEqual([7, 7, 7, 7, 7, 7, 7])
+  })
+
+  it('bands moves by the share of starting time left', () => {
+    // 180 s base; White's clocks after each move are 177, 171, 165, 159.
+    const withClock = { ...summary, clock: [177, 174, 171, 168, 165, 162, 159] }
+    const g: ReviewedGame = { summary: withClock, facts: facts({ side: 'white', clock: { base: 180, increment: 0, spent: [], left: 159, lowest: 0.88 } }), chessComAccuracy: null }
+    // 1. e4 is book and left out, so Bc4, Qh5 and Qxf7# remain.
+    const all = accuracyByClock([g], { contestedOnly: false })
+    expect(all.map((b) => b.label)).toEqual(['Over half', '25–50%', '10–25%', '5–10%', 'Under 5%'])
+    expect(all[0].moves).toBe(3)
+    expect(all.slice(1).every((b) => b.moves === 0)).toBe(true)
+    expect(all[0].accuracySd).toBeGreaterThanOrEqual(0)
+    // Qxf7# is played with mate in one on the board, a decided position.
+    expect(accuracyByClock([g])[0].moves).toBe(2)
+  })
+
+  it('groups games by opening, worst first, above a minimum', () => {
+    const groups = accuracyByOpening(
+      [as('white', { family: 'A', id: '1' }), as('black', { family: 'A', id: '2' }), as('black', { family: 'B', id: '3' })],
+      { minGames: 2 },
+    )
+    expect(groups.map((g) => g.label)).toEqual(['A'])
+    expect(groups[0].gameIds).toEqual(['1', '2'])
+    expect(groups[0].accuracy).toBeCloseTo((summary.accuracy.w + summary.accuracy.b) / 2)
+  })
+
+  it('buckets by the rating gap going into the game', () => {
+    const groups = accuracyByRatingGap([as('white', { myRatingBefore: 1500, oppRatingBefore: 1620 })])
+    expect(groups.find((g) => g.games === 1)!.label).toBe('100+ higher')
+  })
+
+  it('groups games by the result of the one before in the same sitting', () => {
+    const t0 = 1_700_000_000
+    const h = (id: string, start: number, outcome: GameFacts['outcome']) => facts({ id, startTime: t0 + start, endTime: t0 + start + 120, outcome })
+    const history = [h('a', 0, 'lost'), h('b', 200, 'lost'), h('c', 400, 'won'), h('d', 5000, 'won'), h('e', 5200, 'won')]
+    const reviewed = ['a', 'c', 'd', 'e'].map((id) => ({ ...as('white'), facts: history.find((f) => f.id === id)! }))
+    const groups = tilt(reviewed, history)
+    const ids = (label: string) => groups.find((g) => g.label === label)!.gameIds
+    expect(ids('First game of a sitting')).toEqual(['a', 'd'])
+    expect(ids('After two or more losses in a row')).toEqual(['c'])
+    expect(ids('After a win')).toEqual(['e'])
+  })
+})
+
+describe('start time', () => {
+  it('reads the PGN UTC date and time', () => {
+    const g = game({ pgn: `[UTCDate "2026.10.05"]\n[UTCTime "09:04:18"]\n\n1. e4 e5 1-0` })
+    expect(factsOf(g, 'me', book).startTime).toBe(Date.UTC(2026, 9, 5, 9, 4, 18) / 1000)
   })
 })

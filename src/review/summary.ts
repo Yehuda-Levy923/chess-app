@@ -10,7 +10,12 @@ import type { Label, Review, Score } from './types'
 // (which take a few milliseconds a move) worked out once when the review is
 // saved, not every time the Insights screen opens.
 
+/** Bump when the summary gains fields; older summaries are rebuilt from their reviews. */
+export const SUMMARY_FORMAT = 2
+
 export type GameSummary = {
+  /** Missing on the first format */
+  format?: number
   gameId: string
   version: number
   depth: number
@@ -31,6 +36,8 @@ export type GameSummary = {
   clock: (number | null)[]
   /** TACTIC bit flags per ply */
   tactics: number[]
+  /** White's win percent before the first move, then after each ply, rounded */
+  winPercent: number[]
 }
 
 export const TACTIC = {
@@ -66,17 +73,20 @@ export function pieceAt(s: GameSummary, i: number): PieceType {
   return s.pieces[i] as PieceType
 }
 
-export function summarize(review: Review): GameSummary {
-  const flags = review.moves.map((m) => {
-    const them: Color = m.color === 'w' ? 'b' : 'w'
-    const ok = GOOD_ENOUGH.includes(m.label)
-    let f = 0
-    if (mateFor(m.scoreBest, m.color) !== null) f |= TACTIC.mateAvailable | (ok && stillMating(m.scoreAfter, m.color) ? TACTIC.mateFound : 0)
-    if (m.bestUci && allowsFork(m.fenBefore, m.bestUci, them)) f |= TACTIC.forkAvailable | (ok ? TACTIC.forkFound : 0)
-    if (BAD.includes(m.label) && hangs(m.fenAfter, m.color)) f |= TACTIC.hung
-    return f
-  })
+/** The mover's win percent before ply i, 0..100. */
+export function moverWinPercentBefore(s: GameSummary, i: number): number {
+  const w = s.winPercent[i]
+  return colorAt(s, i) === 'w' ? w : 100 - w
+}
+
+/**
+ * `tactics` passes in flags worked out before, such as by the review workflow,
+ * so a summary can be brought up to date without redoing the slow checks.
+ */
+export function summarize(review: Review, known: { tactics?: number[] } = {}): GameSummary {
+  const flags = known.tactics?.length === review.moves.length ? known.tactics : tacticFlags(review)
   return {
+    format: SUMMARY_FORMAT,
     gameId: review.gameId,
     version: review.version ?? 1,
     depth: review.depth,
@@ -90,7 +100,20 @@ export function summarize(review: Review): GameSummary {
     loss: review.moves.map((m) => Math.round(m.loss * 1000) / 1000),
     clock: review.moves.map((m) => m.clock ?? null),
     tactics: flags,
+    winPercent: [review.initialWinPercent, ...review.moves.map((m) => m.winPercentAfter)].map(Math.round),
   }
+}
+
+function tacticFlags(review: Review): number[] {
+  return review.moves.map((m) => {
+    const them: Color = m.color === 'w' ? 'b' : 'w'
+    const ok = GOOD_ENOUGH.includes(m.label)
+    let f = 0
+    if (mateFor(m.scoreBest, m.color) !== null) f |= TACTIC.mateAvailable | (ok && stillMating(m.scoreAfter, m.color) ? TACTIC.mateFound : 0)
+    if (m.bestUci && allowsFork(m.fenBefore, m.bestUci, them)) f |= TACTIC.forkAvailable | (ok ? TACTIC.forkFound : 0)
+    if (BAD.includes(m.label) && hangs(m.fenAfter, m.color)) f |= TACTIC.hung
+    return f
+  })
 }
 
 /** Still on course for mate after the move, or the move itself was mate. */

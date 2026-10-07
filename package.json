@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pull-reviews": "node scripts/pull-reviews.mjs"
   },
   "dependencies": {
     "chess.js": "^1.4.0",

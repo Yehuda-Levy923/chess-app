@@ -11,6 +11,8 @@ export type PieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k'
 export type GameFacts = {
   id: string
   url: string
+  /** Unix seconds, from the PGN's UTCDate and UTCTime; endTime when they're missing */
+  startTime: number
   endTime: number
   timeClass: string
   rated: boolean
@@ -78,6 +80,7 @@ export function factsOf(game: ChessComGame, me: string, book: Book): GameFacts {
   return {
     id: game.uuid,
     url: game.url,
+    startTime: startOf(headers) ?? game.endTime,
     endTime: game.endTime,
     timeClass: game.timeClass,
     rated: game.rated,
@@ -147,6 +150,13 @@ export function phaseOfFinalPosition(fen: string | undefined, plies: number): Ph
     if (pieces <= 6) return 'endgame'
   }
   return plies <= 24 ? 'opening' : 'middlegame'
+}
+
+function startOf(headers: Record<string, string>): number | null {
+  const d = /^(\d{4})\.(\d{2})\.(\d{2})$/.exec(headers.UTCDate ?? '')
+  const t = /^(\d{2}):(\d{2}):(\d{2})$/.exec(headers.UTCTime ?? '')
+  if (!d || !t) return null
+  return Date.UTC(+d[1], +d[2] - 1, +d[3], +t[1], +t[2], +t[3]) / 1000
 }
 
 function clockFacts(timeControl: string, clocks: (number | null)[], myPlies: number[]): ClockFacts | null {
