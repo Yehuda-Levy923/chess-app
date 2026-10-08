@@ -260,3 +260,17 @@ export function DivergingBars({ bars, height = 120, onPick }: { bars: Signed[]; 
     </div>
   )
 }
+
+/** A one-line trend with no axes, e.g. a rating across recent games. */
+export function Sparkline({ values, label, width = 120, height = 28 }: { values: number[]; label: string; width?: number; height?: number }) {
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min || 1
+  const points = values.map((v, i) => `${((i / (values.length - 1)) * width).toFixed(1)},${(height - 2 - ((v - min) / span) * (height - 4)).toFixed(1)}`).join(' ')
+  return (
+    <svg className="sparkline" viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-label={label}>
+      <title>{`${label}: ${min.toLocaleString()} to ${max.toLocaleString()}`}</title>
+      <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+}

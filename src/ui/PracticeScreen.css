@@ -1,0 +1,144 @@
+.practice {
+  max-width: 1280px;
+  padding: 32px 40px 64px;
+}
+
+.practice-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.practice-lead {
+  margin: 0;
+  font-size: 14px;
+}
+
+.practice-focus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 0;
+}
+
+.practice-empty {
+  max-width: 520px;
+  padding-top: 32px;
+}
+
+.practice-empty p {
+  margin: 0 0 8px;
+}
+
+.puzzle-loading {
+  height: min(calc(100vh - 190px), 680px);
+}
+
+.puzzle {
+  display: grid;
+  grid-template-columns: minmax(0, min(calc(100vh - 190px), 680px)) minmax(300px, 380px);
+  gap: 40px;
+  align-items: start;
+  margin-top: 24px;
+}
+
+.puzzle-where {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.puzzle-keys {
+  color: var(--ink-3);
+}
+
+.puzzle-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.puzzle-prompt {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.puzzle-context {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+}
+
+.puzzle-status {
+  min-height: 56px;
+  margin-top: 18px;
+}
+
+.puzzle-status p {
+  margin: 0 0 4px;
+}
+
+.puzzle-status .right {
+  color: var(--tone-found);
+  font-weight: 600;
+}
+
+.puzzle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.puzzle-actions kbd,
+.puzzle-next kbd {
+  margin-left: 6px;
+  opacity: 0.7;
+}
+
+.puzzle-next {
+  height: 44px;
+  padding: 0 18px;
+}
+
+/* The session's numbers as one row under a rule. */
+.puzzle-session {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 28px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.puzzle-session div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.puzzle-session dt {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.puzzle-session dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .practice {
+    padding: 24px 20px 48px;
+  }
+
+  .puzzle {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,9 +1,11 @@
+import type { ReviewedGame } from '../insights/engineStats'
 import type { GameFacts } from '../insights/facts'
 import { RATING_GAP_BUCKETS } from '../insights/stats'
 import type { Drill } from './GamesDrawer'
 import { PerfRows } from './PerfRows'
+import { ConvertDefend } from './technique'
 
-type Props = { games: GameFacts[]; onDrill: (d: Drill) => void }
+type Props = { games: GameFacts[]; reviewed: ReviewedGame[]; onDrill: (d: Drill) => void }
 
 const ENDING: Record<string, string> = {
   checkmated: 'Checkmate',
@@ -21,7 +23,7 @@ const ENDING: Record<string, string> = {
 const DECISIVE = ['checkmated', 'resigned', 'timeout', 'abandoned']
 
 /** How games finish, and how you do against stronger players, as each colour and by when the game was decided. */
-export function InsightsResults({ games, onDrill }: Props) {
+export function InsightsResults({ games, reviewed, onDrill }: Props) {
   const decisive = DECISIVE.map((how) => ({
     how,
     won: games.filter((g) => g.outcome === 'won' && g.how === how),
@@ -36,6 +38,10 @@ export function InsightsResults({ games, onDrill }: Props) {
 
   return (
     <div className="insights-grid">
+      <div className="insights-col wide">
+        <h2>Converting and defending</h2>
+        <ConvertDefend reviewed={reviewed} facts={games} onDrill={onDrill} />
+      </div>
       <div className="insights-col">
         <h2>How your games end</h2>
         <div className="endings" role="table" aria-label="Wins and losses by how the game ended">

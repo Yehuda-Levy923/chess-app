@@ -66,3 +66,39 @@ export const IconBoard = (p: P) => (
     <path d="M2.5 2.5h5.5v5.5H2.5zM8 8h5.5v5.5H8z" fill="currentColor" stroke="none" opacity={0.35} />
   </Svg>
 )
+export const IconPlay = (p: P) => (
+  <Svg {...p}>
+    <path d="M5 3.5v9l7.5-4.5z" fill="currentColor" stroke="none" />
+  </Svg>
+)
+export const IconHome = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 7.5L8 3l5.5 4.5M4 6.5v6.5h3v-3.5h2V13h3V6.5" />
+  </Svg>
+)
+export const IconGames = (p: P) => (
+  <Svg {...p}>
+    <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="0.5" />
+    <path d="M9 3.5h4.5M9 6h3" />
+    <rect x="2.5" y="9" width="4.5" height="4.5" rx="0.5" />
+    <path d="M9 10h4.5M9 12.5h3" />
+  </Svg>
+)
+export const IconTarget = (p: P) => (
+  <Svg {...p}>
+    <circle cx="8" cy="8" r="5.5" />
+    <circle cx="8" cy="8" r="2.5" />
+    <path d="M8 1v2M8 13v2M1 8h2M13 8h2" />
+  </Svg>
+)
+export const IconChart = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 13.5h11M4.5 11V8M7.5 11V4.5M10.5 11V6.5" />
+  </Svg>
+)
+export const IconSettings = (p: P) => (
+  <Svg {...p}>
+    <circle cx="8" cy="8" r="2" />
+    <path d="M8 1.8v1.6M8 12.6v1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M1.8 8h1.6M12.6 8h1.6M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1" />
+  </Svg>
+)

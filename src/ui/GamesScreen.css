@@ -1,0 +1,268 @@
+.games-page {
+  max-width: 1360px;
+  padding: 32px 40px 64px;
+}
+
+.games-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.games-count {
+  margin: 0;
+  font-size: 14px;
+}
+
+.games-error {
+  margin-top: 20px;
+  color: var(--tone-blunder);
+}
+
+.games-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.games-search input,
+.games-search select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--surface-raised);
+  font-size: 14px;
+}
+
+.games-search input:focus,
+.games-search select:focus {
+  outline: none;
+  border-color: var(--ink-2);
+}
+
+.search-text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.games-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+  gap: 48px;
+  align-items: start;
+}
+
+.games-list .progress {
+  margin-top: 24px;
+}
+
+.games-none {
+  margin-top: 20px;
+}
+
+/* Preview: the game under the cursor, steppable with the arrow keys. */
+
+.games-preview {
+  position: sticky;
+  top: 24px;
+  margin-top: 24px;
+}
+
+.preview-text {
+  margin-top: 16px;
+}
+
+.preview-text p {
+  margin: 0 0 2px;
+}
+
+.preview-title {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  margin-bottom: 4px !important;
+}
+
+.preview-open {
+  margin-top: 14px;
+  width: 100%;
+  height: 44px;
+  justify-content: center;
+  gap: 10px;
+}
+
+.preview-open kbd {
+  opacity: 0.7;
+}
+
+/* List */
+
+.games-list .game-head {
+  margin-top: 18px;
+}
+
+.month h2 {
+  margin: 26px 0 0;
+  padding: 0 10px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.game-head,
+.game {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 84px 52px 52px;
+  column-gap: 14px;
+  align-items: center;
+}
+
+.game-head {
+  padding: 0 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.game-head span:first-child {
+  grid-column: 4;
+  text-align: right;
+}
+
+.game-head span:last-child {
+  grid-column: 5;
+  text-align: right;
+}
+
+.games {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.game {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background-color 100ms;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 81px;
+}
+
+.game:hover,
+.game.previewed,
+.game:focus-visible {
+  background: var(--select);
+  outline: none;
+}
+
+.game-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.game-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.game-line .result {
+  font-weight: 600;
+}
+
+.game-line .result.drawn {
+  color: var(--ink-2);
+}
+
+.game-line .result.lost {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.game-vs {
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-opp {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.game-sub {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-when {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.35;
+}
+
+.game-acc {
+  text-align: right;
+  color: var(--ink-2);
+}
+
+.game-acc.ours {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.older {
+  margin-top: 20px;
+}
+
+.calibration {
+  margin: 28px 0 0;
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .games-page {
+    padding: 24px 20px 48px;
+  }
+
+  .games-body {
+    grid-template-columns: 1fr;
+  }
+
+  .games-preview {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .game-head,
+  .game {
+    grid-template-columns: 44px minmax(0, 1fr) 46px 46px;
+  }
+
+  .game-when {
+    display: none;
+  }
+
+  .game-head span:first-child {
+    grid-column: 3;
+  }
+
+  .game-head span:last-child {
+    grid-column: 4;
+  }
+}

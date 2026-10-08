@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChessComError, type ChessComGame } from '../chesscom/api'
+import type { ChessComGame } from '../chesscom/api'
 import { reviewBatch, type BatchProgress } from '../review/batch'
 import { getEngine } from '../stockfish/shared'
 import type { ReviewedGame } from '../insights/engineStats'
-import { factsOf, withPreGameRatings, type GameFacts, type Side } from '../insights/facts'
-import { loadHistory } from '../insights/history'
+import type { Side } from '../insights/facts'
 import { applyFilter, type Filter } from '../insights/stats'
-import { getBook } from '../openings'
-import { allSummaries } from '../review/cache'
-import type { GameSummary } from '../review/summary'
 import { EngineInsights } from './EngineInsights'
 import { GamesDrawer, type Drill } from './GamesDrawer'
 import { InsightsActivity } from './InsightsActivity'
@@ -16,11 +12,11 @@ import { InsightsClock } from './InsightsClock'
 import { InsightsOpenings } from './InsightsOpenings'
 import { InsightsResults } from './InsightsResults'
 import { InsightsSummary } from './InsightsSummary'
-import { IconBack } from './icons'
+import { useHistory } from './history'
 import { ImportReviews } from './ImportReviews'
 import './InsightsScreen.css'
 
-type Props = { username: string; onBack: () => void; onOpen: (game: ChessComGame) => void }
+type Props = { username: string; onOpen: (game: ChessComGame, ply?: number) => void }
 
 type Tab = 'summary' | 'openings' | 'results' | 'clock' | 'activity' | 'engine'
 
@@ -45,39 +41,24 @@ const PERIODS = [
   { id: '30', name: 'Last 30 days', days: 30 },
 ] as const
 
-export function InsightsScreen({ username, onBack, onOpen }: Props) {
-  const [games, setGames] = useState<ChessComGame[] | null>(null)
-  const [progress, setProgress] = useState<[number, number] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [facts, setFacts] = useState<GameFacts[] | null>(null)
-  const [summaries, setSummaries] = useState<GameSummary[]>([])
-  const [tab, setTab] = useState<Tab>('summary')
+export function InsightsScreen({ username, onOpen }: Props) {
+  // The history is loaded once for the whole app; this screen only filters and draws it.
+  const { games, facts, summaries, progress, error, byUuid, summaryById, refreshSummaries: refreshReviewed } = useHistory()
+  // Tab and filters are remembered between visits; a bad stored value just means the defaults.
+  const saved = useMemo(() => readSaved(), [])
+  const [tab, setTab] = useState<Tab>(TABS.some((t) => t.id === saved.tab) ? (saved.tab as Tab) : 'summary')
   const [drill, setDrill] = useState<Drill | null>(null)
-  const [timeClass, setTimeClass] = useState<string>('all')
-  const [side, setSide] = useState<Side | 'both'>('both')
-  const [period, setPeriod] = useState<(typeof PERIODS)[number]['id']>('all')
-
+  const [openingFocus, setOpeningFocus] = useState<string | null>(null)
+  const [timeClass, setTimeClass] = useState<string>(saved.timeClass ?? 'all')
+  const [side, setSide] = useState<Side | 'both'>(saved.side ?? 'both')
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]['id']>(PERIODS.some((p) => p.id === saved.period) ? (saved.period as (typeof PERIODS)[number]['id']) : 'all')
   useEffect(() => {
-    const abort = new AbortController()
-    loadHistory(username, (d, t) => setProgress([d, t]), abort.signal)
-      .then((g) => !abort.signal.aborted && setGames(g))
-      .catch((e) => !abort.signal.aborted && setError(e instanceof ChessComError ? e.message : String(e)))
-    return () => abort.abort()
-  }, [username])
-
-  // One summary per reviewed game, already deduped by the data layer.
-  const refreshReviewed = useCallback(async () => setSummaries(await allSummaries()), [])
-
-  // Reducing ten thousand PGNs takes about a second; yield first so the progress text paints.
-  useEffect(() => {
-    if (!games) return
-    const t = setTimeout(() => {
-      const book = getBook()
-      setFacts(withPreGameRatings(games.map((g) => factsOf(g, username, book))))
-      refreshReviewed()
-    }, 30)
-    return () => clearTimeout(t)
-  }, [games, username, refreshReviewed])
+    try {
+      localStorage.setItem('insights', JSON.stringify({ tab, timeClass, side, period }))
+    } catch {
+      // ignore
+    }
+  }, [tab, timeClass, side, period])
 
   const [batch, setBatch] = useState<{ progress: BatchProgress; ctrl: AbortController } | null>(null)
   // Leaving the screen stops the batch; finished games stay cached.
@@ -110,7 +91,6 @@ export function InsightsScreen({ username, onBack, onOpen }: Props) {
   }, [timeClass, side, period])
 
   const shown = useMemo(() => (facts ? applyFilter(facts, filter) : []), [facts, filter])
-  const byUuid = useMemo(() => new Map((games ?? []).map((g) => [g.uuid, g])), [games])
   /** Reviewed games in the current filter, so engine stats follow the filters too. */
   const shownReviewed: ReviewedGame[] = useMemo(() => {
     const bySummary = new Map(summaries.map((s) => [s.gameId, s]))
@@ -132,9 +112,6 @@ export function InsightsScreen({ username, onBack, onOpen }: Props) {
     return (
       <main className="insights-status">
         <p>{error}</p>
-        <button className="btn" onClick={onBack}>
-          Back to games
-        </button>
       </main>
     )
   }
@@ -159,9 +136,6 @@ export function InsightsScreen({ username, onBack, onOpen }: Props) {
         <div className="progress">
           <div style={{ width: progress ? `${(progress[0] / progress[1]) * 100}%` : '0%' }} />
         </div>
-        <button className="btn" onClick={onBack}>
-          Cancel
-        </button>
       </main>
     )
   }
@@ -169,10 +143,7 @@ export function InsightsScreen({ username, onBack, onOpen }: Props) {
   return (
     <main className="insights">
       <header className="insights-head">
-        <button className="btn btn-quiet back" onClick={onBack}>
-          <IconBack size={16} /> Games
-        </button>
-        <h1>{username}</h1>
+        <h1 className="page-title">Insights</h1>
         <div className="insights-filters">
           <label>
             <span>Time control</span>
@@ -209,7 +180,14 @@ export function InsightsScreen({ username, onBack, onOpen }: Props) {
       <section className="insights-panel">
         <nav className="tabs">
           {TABS.map((t) => (
-            <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+            <button
+              key={t.id}
+              className={tab === t.id ? 'on' : ''}
+              onClick={() => {
+                setOpeningFocus(null)
+                setTab(t.id)
+              }}
+            >
               {t.name}
             </button>
           ))}
@@ -223,12 +201,13 @@ export function InsightsScreen({ username, onBack, onOpen }: Props) {
               history={facts}
               periodDays={PERIODS.find((p) => p.id === period)!.days}
               ratingClass={timeClass === 'all' ? timeClasses[0][0] : timeClass}
+              reviewed={shownReviewed}
               onDrill={setDrill}
             />
           ) : tab === 'results' ? (
-            <InsightsResults games={shown} onDrill={setDrill} />
+            <InsightsResults games={shown} reviewed={shownReviewed} onDrill={setDrill} />
           ) : tab === 'openings' ? (
-            <InsightsOpenings games={shown} filterSide={side === 'both' ? null : side} onDrill={setDrill} />
+            <InsightsOpenings key={openingFocus ?? ''} games={shown} filterSide={side === 'both' ? null : side} onDrill={setDrill} focus={openingFocus} summaries={summaryById} />
           ) : tab === 'clock' ? (
             <InsightsClock
               games={timeClass === 'all' ? shown.filter((g) => g.timeClass === timeClasses[0][0]) : shown}
@@ -249,6 +228,10 @@ export function InsightsScreen({ username, onBack, onOpen }: Props) {
                 onStop={() => batch?.ctrl.abort()}
                 history={facts}
                 onDrill={setDrill}
+                onOpening={(family) => {
+                  setOpeningFocus(family)
+                  setTab('openings')
+                }}
               />
             </>
           )}
@@ -261,4 +244,12 @@ export function InsightsScreen({ username, onBack, onOpen }: Props) {
 
 function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function readSaved(): { tab?: string; timeClass?: string; side?: Side | 'both'; period?: string } {
+  try {
+    return JSON.parse(localStorage.getItem('insights') ?? '{}')
+  } catch {
+    return {}
+  }
 }

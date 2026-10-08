@@ -1,7 +1,6 @@
 .insights {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 22px 32px 48px;
+  max-width: 1560px;
+  padding: 32px 40px 48px;
 }
 
 .insights-head {
@@ -10,13 +9,6 @@
   gap: 18px;
   flex-wrap: wrap;
   padding-bottom: 18px;
-}
-
-.insights-head .back {
-  align-self: center;
-  padding-left: 6px;
-  font-weight: 600;
-  color: var(--ink);
 }
 
 .insights-head h1 {
@@ -534,14 +526,21 @@
 
 .openings {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 36px;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 28px;
   align-items: start;
 }
 
 .openings .tree {
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 28px;
+  /* The board is the point of the tree: give it about a third of the screen. */
+  grid-template-columns: clamp(380px, 34vw, 560px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 1300px) {
+  .openings .tree {
+    grid-template-columns: minmax(0, 560px);
+  }
 }
 
 .openings-head {
@@ -1400,4 +1399,94 @@ button.kpi-value:hover {
 .insights-body .caption {
   margin: -2px 0 8px;
   font-size: 12px;
+}
+
+/* Playing level */
+
+.level {
+  margin-bottom: 8px;
+}
+
+.level > h2 {
+  margin-top: 6px !important;
+}
+
+.level-lead {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.level .level-value {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Converting, defending and clock targets */
+
+.technique-lead {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.technique-line {
+  margin: 16px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.finding-advice {
+  color: var(--ink);
+}
+
+.insights-col.wide {
+  grid-column: 1 / -1;
+}
+
+.technique .perf-rows td.strong {
+  font-weight: 700;
+}
+
+/* Opening tree additions */
+
+.tree-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.tree-help {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.tree-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 3px;
+  margin-right: 7px;
+  vertical-align: middle;
+  border-radius: 1px;
+}
+
+.tree-swatch.main {
+  background: var(--accent);
+}
+
+.tree-swatch.other {
+  background: var(--ink-3);
+}
+
+.tree-rows td,
+.tree-rows th {
+  white-space: nowrap;
+}
+
+.tree-rows td .dim {
+  margin-left: 4px;
+  font-size: 11px;
 }

@@ -3,6 +3,7 @@ import { Chessboard, defaultArrowOptions, type Arrow, type PieceDropHandlerArgs,
 import type { Label } from '../review/types'
 import { boardById, PIECE_CODES, pieceSetById, useAppearance, type PieceSetDef } from './appearance'
 import { Badge } from './Badge'
+import { usePageVisible } from './pageVisible'
 import './GameBoard.css'
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   /** Classification mark pinned to a square, the way chess.com shows the move just played */
   mark?: { square: string; label: Label } | null
   check?: string | null
+  /** A square ringed as a hint, e.g. the piece to move in a puzzle */
+  hint?: string | null
   allowDragging?: boolean
   onPieceDrop?: (args: PieceDropHandlerArgs) => boolean
   /** Small boards (thumbnails, previews) skip coordinates and animation */
@@ -41,14 +44,17 @@ function piecesFor(set: PieceSetDef): PieceRenderObject {
   return pieces
 }
 
-export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, mark, check, allowDragging = false, onPieceDrop, small = false }: Props) {
+export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, mark, check, hint, allowDragging = false, onPieceDrop, small = false }: Props) {
   const { appearance } = useAppearance()
   const board = boardById(appearance.board)
   const pieces = useMemo(() => piecesFor(pieceSetById(appearance.pieces)), [appearance.pieces])
 
   const squareStyles: Record<string, CSSProperties> = {}
   if (lastMove) for (const sq of lastMove) squareStyles[sq] = { background: 'var(--last-move)' }
+  if (hint) squareStyles[hint] = { ...squareStyles[hint], boxShadow: 'inset 0 0 0 4px var(--hint, rgb(232 116 46 / 0.9))' }
   if (check) squareStyles[check] = { ...squareStyles[check], boxShadow: 'inset 0 0 0 3px var(--check)', background: 'var(--check-fill)' }
+
+  const visible = usePageVisible()
 
   const showCoords = appearance.coordinates && !small
   const coord: CSSProperties = { fontSize: 'max(10px, 2cqw)', fontWeight: 600 }
@@ -56,6 +62,7 @@ export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, m
   return (
     <div className={`gameboard ${small ? 'small' : ''}`} style={{ background: board.dark }}>
       {board.image && <img className="gameboard-image" src={board.image} alt="" draggable={false} crossOrigin={board.crossOrigin ? 'anonymous' : undefined} />}
+      {visible && (
       <Chessboard
         options={{
           position: fen,
@@ -81,7 +88,7 @@ export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, m
             <div style={{ width: '100%', height: '100%', ...squareStyles[square] }}>
               {children}
               {mark && mark.square === square && (
-                <span className="gameboard-mark">
+                <span className={`gameboard-mark ${mark.label === 'brilliant' || mark.label === 'great' ? 'celebrate' : ''}`}>
                   <Badge label={mark.label} size={28} />
                 </span>
               )}
@@ -89,6 +96,7 @@ export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, m
           ),
         }}
       />
+      )}
     </div>
   )
 }

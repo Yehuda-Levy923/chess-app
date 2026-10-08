@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BOARDS, boardById, PIECE_SETS, THEMES, useAppearance, type Appearance, type BoardDef } from './appearance'
 import { GameBoard } from './GameBoard'
 import './AppearanceSheet.css'
@@ -18,7 +18,14 @@ function BoardSwatch({ board }: { board: BoardDef }) {
   )
 }
 
-export function AppearanceSheet({ onClose }: { onClose: () => void }) {
+type Account = {
+  username: string
+  depth: number
+  onUsername: (u: string) => void
+  onDepth: (d: number) => void
+}
+
+export function AppearanceSheet({ onClose, account }: { onClose: () => void; account?: Account }) {
   const { appearance, setAppearance } = useAppearance()
   const closeRef = useRef<HTMLButtonElement>(null)
   const set = (patch: Partial<Appearance>) => setAppearance({ ...appearance, ...patch })
@@ -34,9 +41,9 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="sheet-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <aside className="sheet" role="dialog" aria-modal aria-label="Board and pieces">
+      <aside className="sheet" role="dialog" aria-modal aria-label="Settings">
         <header className="sheet-head">
-          <h2>Board and pieces</h2>
+          <h2>Settings</h2>
           <button ref={closeRef} className="sheet-close" onClick={onClose} aria-label="Close">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
               <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -80,6 +87,10 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
             <input type="checkbox" checked={appearance.coordinates} onChange={(e) => set({ coordinates: e.target.checked })} />
             Coordinates on the board
           </label>
+          <label className="sheet-toggle">
+            <input type="checkbox" checked={appearance.sound} onChange={(e) => set({ sound: e.target.checked })} />
+            Move sounds
+          </label>
         </section>
 
         <section className="sheet-section">
@@ -97,7 +108,41 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </section>
+
+        {account && <AccountSection {...account} />}
       </aside>
     </div>
+  )
+}
+
+function AccountSection({ username, depth, onUsername, onDepth }: Account) {
+  const [draft, setDraft] = useState(username)
+  return (
+    <section className="sheet-section">
+      <h3>Games</h3>
+      <form
+        className="sheet-account"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (draft.trim()) onUsername(draft.trim())
+        }}
+      >
+        <label>
+          <span>chess.com username</span>
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} />
+        </label>
+        <button className="btn" type="submit" disabled={!draft.trim() || draft.trim() === username}>
+          Load
+        </button>
+      </form>
+      <label className="sheet-field">
+        <span>Engine depth for new reviews</span>
+        <select value={depth} onChange={(e) => onDepth(Number(e.target.value))}>
+          <option value={12}>12, quick</option>
+          <option value={16}>16</option>
+          <option value={20}>20, slow</option>
+        </select>
+      </label>
+    </section>
   )
 }

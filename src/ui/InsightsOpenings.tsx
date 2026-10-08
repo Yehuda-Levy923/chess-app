@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { GameFacts, Side } from '../insights/facts'
+import type { GameSummary } from '../review/summary'
 import { derived } from './derived'
 import type { Drill } from './GamesDrawer'
 import { openingRows, typicalLine } from './openingLines'
@@ -10,6 +11,10 @@ type Props = {
   /** The screen's colour filter; with "either colour" this tab picks one itself */
   filterSide: Side | null
   onDrill: (d: Drill) => void
+  /** Open on this opening family, e.g. when arriving from the Engine tab */
+  focus?: string | null
+  /** Engine summaries by game id, for the tree's win chances and accuracy */
+  summaries?: Map<string, GameSummary>
 }
 
 type Sort = 'games' | 'cost'
@@ -18,13 +23,21 @@ const pct = (x: number) => `${(x * 100).toFixed(1)}%`
 const signed = (x: number) => `${x > 0 ? '+' : x < 0 ? '−' : ''}${Math.abs(x).toFixed(1)}`
 
 /** Your openings for one colour on the left; picking one opens the move tree at its usual line. */
-export function InsightsOpenings({ games, filterSide, onDrill }: Props) {
+export function InsightsOpenings({ games, filterSide, onDrill, focus = null, summaries }: Props) {
   const busier: Side = games.filter((g) => g.side === 'white').length >= games.length / 2 ? 'white' : 'black'
-  const [localSide, setLocalSide] = useState<Side>(busier)
+  // Arriving with a focus: the colour you play it with more, and its usual line already open.
+  const focusSide = (): Side => {
+    const as = (s: Side) => games.filter((g) => g.family === focus && g.side === s).length
+    return as('white') >= as('black') ? 'white' : 'black'
+  }
+  const [localSide, setLocalSide] = useState<Side>(() => (focus ? focusSide() : busier))
   const side = filterSide ?? localSide
   const [sort, setSort] = useState<Sort>('games')
-  const [path, setPath] = useState<string[]>([])
-  const [selected, setSelected] = useState<string | null>(null)
+  const [path, setPath] = useState<string[]>(() => (focus ? typicalLine(games.filter((g) => g.family === focus && g.side === (filterSide ?? focusSide()))) : []))
+  const [selected, setSelected] = useState<string | null>(focus)
+  useEffect(() => {
+    if (focus) document.querySelector('.opening-row.on')?.scrollIntoView({ block: 'nearest' })
+  }, [focus])
 
   const mine = derived(games, `side:${side}`, () => games.filter((g) => g.side === side))
   const rows = useMemo(() => {
@@ -74,7 +87,9 @@ export function InsightsOpenings({ games, filterSide, onDrill }: Props) {
                     setPath(typicalLine(r.facts))
                   }}
                 >
-                  <span className="opening-name">{r.family}</span>
+                  <span className="opening-name" title={r.family}>
+                    {r.family}
+                  </span>
                   <span className="opening-games num">{r.games.toLocaleString()}</span>
                   <span className="opening-share" aria-hidden>
                     <span style={{ width: `${(r.games / maxGames) * 100}%` }} />
@@ -105,7 +120,7 @@ export function InsightsOpenings({ games, filterSide, onDrill }: Props) {
         )}
       </div>
 
-      <OpeningTree games={mine} side={side} path={path} onPath={setPath} onDrill={onDrill} />
+      <OpeningTree games={mine} side={side} path={path} onPath={setPath} onDrill={onDrill} summaries={summaries} />
     </div>
   )
 }

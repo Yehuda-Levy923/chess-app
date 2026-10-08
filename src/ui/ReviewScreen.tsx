@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chess, type PieceSymbol } from 'chess.js'
 import type { Arrow } from 'react-chessboard'
 import type { ChessComGame, ChessComPlayer } from '../chesscom/api'
@@ -17,14 +17,15 @@ import { EngineLines } from './EngineLines'
 import { EvalGraph } from './EvalGraph'
 import { GameBoard } from './GameBoard'
 import { captures, checkedKing, clocksFromPgn, formatClock } from './gameInfo'
-import { IconBack, IconBoard, IconExternal, IconFirst, IconFlip, IconKeyNext, IconKeyPrev, IconLast, IconNext, IconPrev, IconRetry } from './icons'
+import { IconBack, IconBoard, IconPlay, IconExternal, IconFirst, IconFlip, IconKeyNext, IconKeyPrev, IconLast, IconNext, IconPrev, IconRetry } from './icons'
 import { KEY_LABELS, LABEL_TEXT, toneOf } from './labels'
 import { useLiveAnalysis, type Live } from './liveAnalysis'
 import { MoveList } from './MoveList'
+import { playCue, playMove as soundMove } from './sound'
 import { judge, RetryPanel, type Attempt } from './RetryPanel'
 import './ReviewScreen.css'
 
-type Props = { game: ChessComGame; username: string; depth: number; onBack: () => void }
+type Props = { game: ChessComGame; username: string; depth: number; onBack: () => void; /** Open on this move instead of the start */ startPly?: number | null }
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const RETRY_LABELS = ['mistake', 'miss', 'blunder']
@@ -81,7 +82,7 @@ function writeFlag(key: string, on: boolean) {
   }
 }
 
-export function ReviewScreen({ game, username, depth, onBack }: Props) {
+export function ReviewScreen({ game, username, depth, onBack, startPly = null }: Props) {
   const mySide = game.black.username.toLowerCase() === username.toLowerCase() ? 'black' : 'white'
   const { appearance, openSettings } = useAppearance()
   const [review, setReview] = useState<Review | null>(null)
@@ -90,8 +91,11 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
   const [ply, setPly] = useState(0)
   const [orientation, setOrientation] = useState<'white' | 'black'>(mySide)
   const [tab, setTab] = useState<'moves' | 'report'>('moves')
-  const [retry, setRetry] = useState<{ index: number; attempt: Attempt | null; fen: string | null; revealed: boolean } | null>(null)
+  const [retry, setRetry] = useState<{ index: number; attempt: Attempt | null; fen: string | null; revealed: boolean; to?: string } | null>(null)
   const [variation, setVariation] = useState<Variation | null>(null)
+  // Guided review: which key moment, and whether we're looking at the position before it or the move itself.
+  const [guide, setGuide] = useState<{ step: number; phase: 'before' | 'after' } | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [engineOn, setEngineOn] = useState(() => readFlag('engine', true))
   // Live results by FEN, kept for the whole screen so revisited positions show at once.
   const memo = useMemo(() => new Map<string, Live>(), [])
@@ -100,7 +104,9 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
     const abort = new AbortController()
     ;(async () => {
       const { review: r } = await reviewGame(game, depth, getEngine(), (d, t) => setProgress([d, t]), abort.signal)
-      if (!abort.signal.aborted) setReview(r)
+      if (abort.signal.aborted) return
+      setReview(r)
+      if (startPly !== null) setPly(Math.max(0, Math.min(r.moves.length, startPly)))
     })().catch((e) => {
       if (!abort.signal.aborted) setError(e instanceof Error ? e.message : String(e))
     })
@@ -111,6 +117,7 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
   const go = useCallback(
     (p: number) => {
       setVariation(null)
+      setGuide(null)
       setPly(Math.max(0, Math.min(n, p)))
     },
     [n],
@@ -126,25 +133,67 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
     [variation, go, ply],
   )
 
+  const moments = useMemo(() => review?.moves.filter((m) => KEY_LABELS.includes(m.label)) ?? [], [review])
+
+  /** Moves the guided review to a key moment: first the position before it, then the move itself. */
+  const showGuide = useCallback(
+    (step: number, phase: 'before' | 'after') => {
+      const m = moments[step]
+      if (!m) return
+      setVariation(null)
+      setPly(phase === 'before' ? m.ply - 1 : m.ply)
+      setGuide({ step, phase })
+    },
+    [moments],
+  )
+  const guideNext = useCallback(() => {
+    if (!guide) return showGuide(0, 'before')
+    if (guide.phase === 'before') return showGuide(guide.step, 'after')
+    if (guide.step + 1 < moments.length) return showGuide(guide.step + 1, 'before')
+    setGuide(null)
+    go(n)
+  }, [guide, moments.length, showGuide, go, n])
+  const guideBack = useCallback(() => {
+    if (!guide) return
+    if (guide.phase === 'after') showGuide(guide.step, 'before')
+    else if (guide.step > 0) showGuide(guide.step - 1, 'after')
+  }, [guide, showGuide])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || document.querySelector('.sheet')) return
-      if (e.key === 'f' && !e.ctrlKey && !e.metaKey) {
-        setOrientation((o) => (o === 'white' ? 'black' : 'white'))
-        return
-      }
-      if (retry) return
-      if (e.key === 'ArrowLeft') step(-1)
-      else if (e.key === 'ArrowRight') step(1)
-      else if (e.key === 'Home') go(0)
-      else if (e.key === 'End') go(n)
-      else if (e.key === 'Escape' && variation) go(variation.basePly)
-      else return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || document.querySelector('.sheet')) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const k = e.key
+      if (k === '?') setShortcutsOpen((o) => !o)
+      else if (k === 'f') setOrientation((o) => (o === 'white' ? 'black' : 'white'))
+      else if (k === 'Escape' && shortcutsOpen) setShortcutsOpen(false)
+      else if (retry) {
+        if (k === 'Escape') setRetry(null)
+        else return
+      } else if (k === ' ' && e.shiftKey) guideBack()
+      else if (k === ' ') guideNext()
+      else if (k === 'Escape' && guide) setGuide(null)
+      else if (k === 'Escape' && variation) go(variation.basePly)
+      else if (k === 'ArrowLeft' || k === 'j') {
+        setGuide(null)
+        step(-1)
+      } else if (k === 'ArrowRight' || k === 'k') {
+        setGuide(null)
+        step(1)
+      } else if (k === 'Home') go(0)
+      else if (k === 'End') go(n)
+      else if (k === 'g') onBack()
+      else if (k === 'r' && review) {
+        // Retry the mistake on screen if there is one, otherwise the first.
+        const mine = review.moves.filter((m) => m.color === (mySide === 'white' ? 'w' : 'b') && RETRY_LABELS.includes(m.label))
+        const at = mine.findIndex((m) => m.ply === ply)
+        if (mine.length) setRetry({ index: Math.max(0, at), attempt: null, fen: null, revealed: false })
+      } else return
       e.preventDefault()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go, step, n, retry, variation])
+  }, [go, step, n, retry, variation, guide, guideNext, guideBack, shortcutsOpen, onBack, review, mySide, ply])
 
   const myColor = mySide === 'white' ? 'w' : 'b'
   const targets = useMemo(
@@ -164,13 +213,34 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
       : mainFen(ply)
   const live = useLiveAnalysis(fen, !!review && engineOn && !retry, memo)
 
+  // Sound when a move lands on the board: stepping forward through the game or
+  // a line plays it, stepping back stays quiet. A brilliant move gets its own cue.
+  const heard = useRef<{ ply: number; index: number }>({ ply: 0, index: 0 })
+  useEffect(() => {
+    if (!review || retry) return
+    const prev = heard.current
+    const index = variation?.index ?? 0
+    heard.current = { ply, index }
+    if (variation) {
+      if (index > prev.index && prev.ply === ply) soundMove(variation.moves[index - 1].san)
+      return
+    }
+    // One step forward only: a jump (to the end, or the next guided moment) isn't a move being played.
+    if (ply === prev.ply + 1) {
+      const m = review.moves[ply - 1]
+      if (!m) return
+      soundMove(m.san)
+      if (m.label === 'brilliant') setTimeout(() => playCue('brilliant'), 140)
+    }
+  }, [ply, variation, review, retry])
+
   if (error) {
     return (
       <main className="review-status">
         <h1>The review stopped</h1>
         <p>{error}</p>
         <button className="btn" onClick={onBack}>
-          Back to games
+          Back
         </button>
       </main>
     )
@@ -262,7 +332,12 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
   const shownMove = retryTarget ? null : variation ? varMove : current
   const shownLabel = retryTarget ? null : variation ? varLabel : (current?.label ?? null)
   const lastMove: [string, string] | null = shownMove ? [shownMove.uci.slice(0, 2), shownMove.uci.slice(2, 4)] : null
-  const mark = shownMove && shownLabel ? { square: shownMove.uci.slice(2, 4), label: shownLabel } : null
+  // In a retry, the try itself gets the mark: best when it holds, a question mark when it doesn't.
+  const retryMark =
+    retry?.to && retry.fen && (retry.attempt?.state === 'right' || retry.attempt?.state === 'wrong')
+      ? { square: retry.to, label: (retry.attempt.state === 'right' ? 'best' : 'mistake') as Label }
+      : null
+  const mark = retryMark ?? (shownMove && shownLabel ? { square: shownMove.uci.slice(2, 4), label: shownLabel } : null)
 
   const top = orientation === 'white' ? game.black : game.white
   const bottom = orientation === 'white' ? game.white : game.black
@@ -334,9 +409,11 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
     const tried = playMove(retryTarget.fenBefore, sourceSquare, targetSquare)
     if (!tried) return false
     const index = retry!.index
-    setRetry((r) => r && { ...r, fen: tried.fen, attempt: { state: 'thinking', san: tried.san } })
+    setRetry((r) => r && { ...r, fen: tried.fen, to: targetSquare, attempt: { state: 'thinking', san: tried.san } })
+    soundMove(tried.san)
     judge(retryTarget, sourceSquare, targetSquare).then((a) => {
       setRetry((r) => (r && r.index === index ? { ...r, attempt: a } : r))
+      if (a) playCue(a.state === 'right' ? 'right' : 'wrong')
       // A wrong try goes back so the next one starts from the real position.
       if (a?.state === 'wrong') {
         setTimeout(() => setRetry((r) => (r && r.index === index && r.fen === tried.fen ? { ...r, fen: null } : r)), 900)
@@ -428,7 +505,7 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
       <aside className="panel">
         <div className="panel-head">
           <button className="btn btn-quiet back" onClick={onBack}>
-            <IconBack /> Games
+            <IconBack /> Back
           </button>
           <span className="panel-opening" title={review.opening ?? undefined}>
             {review.opening ?? 'Unnamed opening'}
@@ -463,6 +540,18 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
           }}
           onPlayLine={(ucis) => !retry && extendWith(ucis)}
         />
+
+        {guide && moments[guide.step] && (
+          <GuideBar
+            step={guide.step}
+            total={moments.length}
+            phase={guide.phase}
+            move={moments[guide.step]}
+            onNext={guideNext}
+            onBack={guideBack}
+            onStop={() => setGuide(null)}
+          />
+        )}
 
         <div className="tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'moves'} className={tab === 'moves' ? 'on' : ''} onClick={() => setTab('moves')}>
@@ -640,6 +729,9 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
             <button className="btn btn-icon" onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))} aria-label="Flip board" title="Flip board (F)">
               <IconFlip />
             </button>
+            <button className="btn guide-start" onClick={() => (guide ? setGuide(null) : guideNext())} disabled={!!retry || moments.length === 0} title="Walk through the key moments (Space)">
+              <IconPlay /> {guide ? 'Stop review' : 'Play review'}
+            </button>
             <button
               className="btn btn-primary retry-all"
               onClick={() => {
@@ -652,8 +744,12 @@ export function ReviewScreen({ game, username, depth, onBack }: Props) {
               {targets.length ? `Retry my mistakes (${targets.length})` : 'No mistakes to retry'}
             </button>
           </div>
+          <button className="shortcuts-hint" onClick={() => setShortcutsOpen(true)}>
+            Keyboard shortcuts <kbd>?</kbd>
+          </button>
         </div>
       </aside>
+      {shortcutsOpen && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
     </main>
   )
 }
@@ -681,3 +777,93 @@ const QUIET_ENOUGH: Label[] = ['best', 'brilliant', 'great', 'excellent']
 
 const PHASES: PhaseName[] = ['opening', 'middlegame', 'endgame']
 const PHASE_TEXT: Record<PhaseName, string> = { opening: 'Opening', middlegame: 'Middlegame', endgame: 'Endgame' }
+
+/** The guided review's bar: where you are, what to do, and the way on. */
+function GuideBar({ step, total, phase, move, onNext, onBack, onStop }: {
+  step: number
+  total: number
+  phase: 'before' | 'after'
+  move: ReviewedMove
+  onNext: () => void
+  onBack: () => void
+  onStop: () => void
+}) {
+  const side = move.color === 'w' ? 'White' : 'Black'
+  const last = step === total - 1 && phase === 'after'
+  return (
+    <section className={`guide ${phase}`} aria-live="polite">
+      <div className="guide-progress" aria-hidden>
+        {Array.from({ length: total }, (_, i) => (
+          <span key={i} className={i < step || (i === step && phase === 'after') ? 'done' : i === step ? 'now' : ''} />
+        ))}
+      </div>
+      <p className="guide-text">
+        <span className="guide-count num">
+          {step + 1} of {total}
+        </span>
+        {phase === 'before' ? (
+          <>
+            {' '}
+            {side} to move. What would you play?
+          </>
+        ) : (
+          <>
+            {' '}
+            {side} played <strong>{move.san}</strong>, {LABEL_TEXT[move.label].phrase}.
+          </>
+        )}
+      </p>
+      <div className="guide-actions">
+        <button className="btn btn-quiet" onClick={onBack} disabled={step === 0 && phase === 'before'} aria-label="Back (Shift+Space)">
+          <IconPrev />
+        </button>
+        <button className="btn btn-primary" onClick={onNext}>
+          {phase === 'before' ? 'Show the move' : last ? 'Finish' : 'Next moment'} <kbd>Space</kbd>
+        </button>
+        <button className="btn btn-quiet" onClick={onStop}>
+          Stop
+        </button>
+      </div>
+    </section>
+  )
+}
+
+const SHORTCUTS: [string, string][] = [
+  ['← → or J K', 'Previous / next move'],
+  ['Home End', 'Start / end of the game'],
+  ['Space', 'Play the guided review, or its next step'],
+  ['R', 'Retry the mistake on screen'],
+  ['F', 'Flip the board'],
+  ['Esc', 'Leave a line, retry or guided review'],
+  ['G', 'Back to the page you came from'],
+  ['?', 'Show or hide this list'],
+]
+
+function Shortcuts({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="sheet-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <aside className="sheet shortcuts" role="dialog" aria-modal aria-label="Keyboard shortcuts">
+        <header className="sheet-head">
+          <h2>Keyboard shortcuts</h2>
+          <button className="sheet-close" onClick={onClose} aria-label="Close">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+              <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </header>
+        <dl className="shortcut-list">
+          {SHORTCUTS.map(([keys, what]) => (
+            <div key={keys}>
+              <dt>
+                {keys.split(' ').map((k) => (
+                  <kbd key={k}>{k}</kbd>
+                ))}
+              </dt>
+              <dd>{what}</dd>
+            </div>
+          ))}
+        </dl>
+      </aside>
+    </div>
+  )
+}

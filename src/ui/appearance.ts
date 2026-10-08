@@ -62,9 +62,9 @@ export const PIECE_SETS: PieceSetDef[] = [
   lichess('fantasy', 'Fantasy'),
 ]
 
-export type Appearance = { theme: ThemeId; board: string; pieces: string; coordinates: boolean }
+export type Appearance = { theme: ThemeId; board: string; pieces: string; coordinates: boolean; sound: boolean }
 
-export const DEFAULT_APPEARANCE: Appearance = { theme: 'fire', board: 'burled', pieces: 'lolz', coordinates: true }
+export const DEFAULT_APPEARANCE: Appearance = { theme: 'fire', board: 'burled', pieces: 'lolz', coordinates: true, sound: true }
 
 const KEY = 'appearance'
 
@@ -79,6 +79,7 @@ export function loadAppearance(): Appearance {
       board: BOARDS.some((b) => b.id === saved.board) ? saved.board! : DEFAULT_APPEARANCE.board,
       pieces: PIECE_SETS.some((p) => p.id === saved.pieces) ? saved.pieces! : DEFAULT_APPEARANCE.pieces,
       coordinates: saved.coordinates ?? DEFAULT_APPEARANCE.coordinates,
+      sound: saved.sound ?? DEFAULT_APPEARANCE.sound,
     }
   } catch {
     return DEFAULT_APPEARANCE

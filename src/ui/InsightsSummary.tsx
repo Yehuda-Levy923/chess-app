@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react'
+import { clockTargets } from '../insights/clockTargets'
+import { conversion } from '../insights/conversion'
+import type { ReviewedGame } from '../insights/engineStats'
 import type { GameFacts } from '../insights/facts'
 import { ratingSeries } from '../insights/stats'
 import { DivergingBars, LineChart, PerfBar } from './charts'
 import { byMonth, comparePeriods, findings, type RankedFinding } from './findings'
 import { derived } from './derived'
 import type { Drill } from './GamesDrawer'
+import { clockAdvice, secs } from './technique'
 
 type Props = {
   /** Games in the current filter */
@@ -14,13 +18,15 @@ type Props = {
   /** The filter's period in days, or null for all time */
   periodDays: number | null
   ratingClass: string
+  /** Reviewed games in the filter, for converting and defending */
+  reviewed: ReviewedGame[]
   onDrill: (d: Drill) => void
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`
 const signed = (x: number, digits = 1) => `${x > 0 ? '+' : x < 0 ? '−' : ''}${Math.abs(x).toFixed(digits)}`
 
-export function InsightsSummary({ games, history, periodDays, ratingClass, onDrill }: Props) {
+export function InsightsSummary({ games, history, periodDays, ratingClass, reviewed, onDrill }: Props) {
   const { weaknesses, strengths, tested } = derived(games, 'findings', () => findings(games, {}, history))
   const clear = weaknesses.filter((f) => f.confidence === 'clear')
   const possible = weaknesses.filter((f) => f.confidence === 'possible')
@@ -51,9 +57,20 @@ export function InsightsSummary({ games, history, periodDays, ratingClass, onDri
     if (f.kind !== 'clock') return null
     const losses = games.filter((g) => f.ids.has(g.id) && g.outcome === 'lost')
     const onTime = losses.filter((g) => g.how === 'timeout').length
+    const target = derived(games, 'clock-target', () => {
+      const t = clockTargets(games)[0]
+      return t ? clockAdvice(t) : null
+    })
     return losses.length ? (
       <>
         <span className="num">{onTime.toLocaleString()}</span> of its <span className="num">{losses.length.toLocaleString()}</span> losses were on time.
+        {target && (
+          <span className="finding-advice">
+            {' '}
+            In {target.timeClass}, aim to reach move {target.move} with about {secs(target.won)}: that's what you had in your wins, against {secs(target.flagged)} in
+            the games you lost on time.
+          </span>
+        )}
       </>
     ) : null
   }
@@ -137,6 +154,8 @@ export function InsightsSummary({ games, history, periodDays, ratingClass, onDri
               </ol>
             </>
           )}
+
+          {reviewed.length > 0 && <TechniqueLine reviewed={reviewed} games={games} onDrill={onDrill} />}
 
           <h2>Doing better than expected</h2>
           {strengths.length === 0 ? (
@@ -257,4 +276,28 @@ function monthName(start: number, long = false): string {
 
 function formatDay(t: number): string {
   return new Date(t * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** One line on converting and defending, each figure opening its games. */
+function TechniqueLine({ reviewed, games, onDrill }: { reviewed: ReviewedGame[]; games: GameFacts[]; onDrill: (d: Drill) => void }) {
+  const c = derived(reviewed, 'conversion', () => conversion(reviewed))
+  const byId = new Map(games.map((g) => [g.id, g]))
+  const w = c.me.winning
+  const l = c.me.losing
+  if (!w.games && !l.games) return null
+  const open = (title: string, ids: string[]) => onDrill({ title, games: ids.flatMap((id) => byId.get(id) ?? []) })
+  const pctOf = (n: number, of: number) => `${Math.round((n / Math.max(1, of)) * 100)}%`
+  return (
+    <p className="technique-line">
+      From the engine reviews: you converted{' '}
+      <button className="link-button num" onClick={() => open('Games where you were winning', w.gameIds)}>
+        {pctOf(w.won, w.games)}
+      </button>{' '}
+      of winning positions and saved{' '}
+      <button className="link-button num" onClick={() => open('Games where you were losing', l.gameIds)}>
+        {pctOf(l.won + l.drawn, l.games)}
+      </button>{' '}
+      of losing ones. The Results tab has the detail.
+    </p>
+  )
 }

@@ -340,3 +340,74 @@ select {
 .btn svg {
   flex-shrink: 0;
 }
+
+/* Motion. Screens and tabs arrive instead of snapping in; anything that can
+   be pressed answers the press. All of it goes when the system asks for
+   reduced motion. */
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.start,
+.review,
+.review-status,
+.insights,
+.insights-status {
+  animation: screen-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.insights-body > * {
+  animation: fade-in 180ms ease-out both;
+}
+
+/* Rows and tiles that open something: a quick dip on press. */
+.game:active,
+.drill-game:active,
+.opening-row:active,
+.move:active,
+.pv-move:active,
+.divbars-col:active,
+.calendar-day:not(:disabled):active,
+.choice:active .choice-art {
+  transform: scale(0.985);
+}
+
+.game,
+.drill-game,
+.opening-row,
+.move,
+.pv-move,
+.choice-art {
+  transition:
+    transform 90ms ease-out,
+    background-color 120ms;
+}
+
+tr[tabindex]:active {
+  background: color-mix(in srgb, var(--select) 70%, var(--ink) 8%) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Pages stay mounted while hidden; [hidden] has to win over any display rule. */
+[hidden] {
+  display: none !important;
+}

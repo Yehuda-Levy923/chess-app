@@ -1,0 +1,25 @@
+.viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.viewer-bar {
+  display: grid;
+  grid-template-columns: 40px 1fr auto 1fr 40px;
+  align-items: center;
+  gap: 6px;
+}
+
+.viewer-bar .nav-step {
+  height: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+.viewer-move {
+  min-width: 7ch;
+  text-align: center;
+  font-weight: 600;
+  color: var(--ink-2);
+}

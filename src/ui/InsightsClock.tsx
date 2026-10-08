@@ -1,8 +1,10 @@
 import type { GameFacts } from '../insights/facts'
+import { clockTargets } from '../insights/clockTargets'
 import { clockUse } from '../insights/stats'
 import { BarChart } from './charts'
 import type { Drill } from './GamesDrawer'
 import { PerfRows } from './PerfRows'
+import { clockAdvice, secs } from './technique'
 
 type Props = {
   /** Games of one time control; clocks of different lengths don't average into anything */
@@ -28,6 +30,8 @@ export function InsightsClock({ games, timeClass, onDrill }: Props) {
   const flagged = timed.filter((g) => g.outcome === 'lost' && g.how === 'timeout')
   const flaggedThem = timed.filter((g) => g.outcome === 'won' && g.how === 'timeout')
   const cap = timeClass[0].toUpperCase() + timeClass.slice(1)
+  const targets = clockTargets(timed).find((t) => t.timeClass === timeClass) ?? null
+  const advice = targets ? clockAdvice(targets) : null
 
   return (
     <div className="insights-grid">
@@ -55,6 +59,42 @@ export function InsightsClock({ games, timeClass, onDrill }: Props) {
         </p>
       </div>
       <div className="insights-col">
+        {targets && (
+          <>
+            <h2>
+              {cap} {targets.base >= 60 ? targets.base / 60 : `${targets.base}s`}+{targets.increment}: seconds left, wins against time losses
+            </h2>
+            {advice && (
+              <p className="technique-lead">
+                Aim to reach move {advice.move} with about {secs(advice.won)} left. That's what you had in the games you won; in the games you lost on time
+                you had {secs(advice.flagged)}.
+              </p>
+            )}
+            <table className="itable">
+              <thead>
+                <tr>
+                  <th />
+                  <th className="r">In wins</th>
+                  <th className="r">In time losses</th>
+                </tr>
+              </thead>
+              <tbody>
+                {targets.checkpoints.map((c) => (
+                  <tr key={c.move}>
+                    <td>After move {c.move}</td>
+                    <td className="r num">
+                      {c.medianLeftWon === null ? '' : secs(c.medianLeftWon)} <span className="dim">({c.wonGames.toLocaleString()})</span>
+                    </td>
+                    <td className="r num">
+                      {c.medianLeftFlagged === null ? '' : secs(c.medianLeftFlagged)} <span className="dim">({c.flaggedGames.toLocaleString()})</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="dim caption">Median seconds on your clock, with the number of games in brackets. Only games that lasted that long count.</p>
+          </>
+        )}
         <h2>{cap}: time spent per move, as a share of the starting clock</h2>
         <BarChart
           format={(v) => `${(v * 100).toFixed(1)}%`}

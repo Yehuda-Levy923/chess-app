@@ -1,0 +1,146 @@
+/* The app frame: a fixed sidebar and the page beside it. */
+
+.shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.shell-main {
+  min-width: 0;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px 16px;
+  border-right: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+}
+
+.brand {
+  padding: 4px 12px 24px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.side-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+
+.side-item:hover {
+  background: var(--select);
+  color: var(--ink);
+}
+
+.side-item.on {
+  background: var(--select);
+  color: var(--ink);
+}
+
+.side-item.on svg {
+  color: var(--accent);
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.me {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.me-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-rating {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* Narrow windows: icons only. */
+@media (max-width: 1100px) {
+  .shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    padding: 16px 8px;
+  }
+
+  .sidebar {
+    padding-top: 20px;
+  }
+
+  .brand,
+  .side-name,
+  .me {
+    display: none;
+  }
+
+  .side-item {
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+/* Pages inside the shell share a measure and a title. */
+
+.page-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.page-error {
+  max-width: 560px;
+  padding: 48px 40px;
+}
+
+.page-error p {
+  margin: 12px 0 18px;
+}
