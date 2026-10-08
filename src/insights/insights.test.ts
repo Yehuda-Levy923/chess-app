@@ -4,7 +4,11 @@ import { buildBook } from '../openings/book'
 import { buildReview, movesFromPgn, terminalScore } from '../review/buildReview'
 import type { PositionAnalysis, Score } from '../review/types'
 import { summarize } from '../review/summary'
-import { accuracyByClock, accuracyByMove, accuracyByOpening, accuracyByRatingGap, moveQuality, tactics, tilt, type ReviewedGame } from './engineStats'
+import { accuracyByClock, accuracyByMove, accuracyByOpening, accuracyByRatingGap, moveQuality, playingLevel, tactics, tilt, type ReviewedGame } from './engineStats'
+import { estimateRating } from '../review/gameRating'
+import { clockTargets } from './clockTargets'
+import { conversion } from './conversion'
+import { tacticMoments } from './engineStats'
 import { factsOf, phaseOfFinalPosition, withPreGameRatings, type GameFacts } from './facts'
 import { byRatingGap, castling, clockUse, howGamesEnd, openings, overall, pieceShare, score } from './stats'
 import { branches, buildTree, nodeAt } from './tree'
@@ -244,6 +248,38 @@ describe('engine stats', () => {
     expect(groups[0].accuracy).toBeCloseTo((summary.accuracy.w + summary.accuracy.b) / 2)
   })
 
+  it('averages the played-like rating per time control', () => {
+    const levels = playingLevel([
+      as('white', { id: '1', timeClass: 'blitz', myRatingBefore: 1500 }),
+      as('black', { id: '2', timeClass: 'blitz', myRatingBefore: 1600 }),
+      as('white', { id: '3', timeClass: 'daily', myRatingBefore: 1500 }),
+    ])
+    expect(levels.map((l) => l.timeClass)).toEqual(['blitz'])
+    const one = estimateRating(summary.accuracy.w, 'blitz', 1500)!
+    const two = estimateRating(summary.accuracy.b, 'blitz', 1600)!
+    expect(levels[0].blended).toBeCloseTo((one.blended! + two.blended!) / 2)
+    expect(levels[0].accuracyOnly).toBeCloseTo((one.accuracyOnly + two.accuracyOnly) / 2)
+    expect(levels[0].ratingBefore).toBe(1550)
+    expect(levels[0].gameIds).toEqual(['1', '2'])
+  })
+  it('counts converted wins and saved losses from both sides', () => {
+    // White mates on ply 7 after Black's 3...Nf6?? leaves Qxf7# on.
+    const c = conversion([as('white', { outcome: 'won' }), as('black', { outcome: 'lost', how: 'checkmated' })], { fromPly: 1 })
+    expect(c.me.winning).toMatchObject({ games: 1, won: 1 })
+    expect(c.me.losing).toMatchObject({ games: 1, lost: 1, lostOnTime: 0 })
+    expect(c.opponents.winning).toMatchObject({ games: 1, won: 1 })
+    expect(c.byTimeClass.blitz.me.winning.gameIds).toHaveLength(1)
+    // From ply 16 on there is nothing left of this seven-ply game.
+    expect(conversion([as('white', { outcome: 'won' })]).me.winning.games).toBe(0)
+  })
+
+  it('lists the moves behind each tactics count', () => {
+    const t = tactics([as('white')])
+    const m = tacticMoments([as('white')])
+    for (const k of Object.keys(t) as (keyof typeof t)[]) expect(m[k]).toHaveLength(t[k])
+    expect(m.matesFound).toEqual([{ gameId: 'g', index: 6 }])
+  })
+
   it('buckets by the rating gap going into the game', () => {
     const groups = accuracyByRatingGap([as('white', { myRatingBefore: 1500, oppRatingBefore: 1620 })])
     expect(groups.find((g) => g.games === 1)!.label).toBe('100+ higher')
@@ -259,6 +295,31 @@ describe('engine stats', () => {
     expect(ids('First game of a sitting')).toEqual(['a', 'd'])
     expect(ids('After two or more losses in a row')).toEqual(['c'])
     expect(ids('After a win')).toEqual(['e'])
+  })
+})
+
+describe('clock targets', () => {
+  const clocked = (o: Partial<GameFacts>, spentEach: number, moves: number): GameFacts =>
+    facts({ timeClass: 'bullet', clock: { base: 60, increment: 0, spent: Array(moves).fill(spentEach), left: null, lowest: null }, ...o })
+
+  it('compares time left at move N in wins and in time losses', () => {
+    const t = clockTargets([
+      clocked({ outcome: 'won' }, 1, 40),
+      clocked({ outcome: 'won' }, 1.5, 40),
+      clocked({ outcome: 'lost', how: 'timeout' }, 2, 30),
+      clocked({ outcome: 'lost', how: 'resigned' }, 1, 25),
+    ])
+    expect(t).toHaveLength(1)
+    expect(t[0]).toMatchObject({ timeClass: 'bullet', base: 60, games: 4, flaggedShareOfLosses: 0.5 })
+    const at20 = t[0].checkpoints.find((c) => c.move === 20)!
+    expect(at20).toMatchObject({ medianLeftWon: 35, wonGames: 2, medianLeftFlagged: 20, flaggedGames: 1 })
+    // The time loss ended before move 40, so only the wins count there.
+    expect(t[0].checkpoints.find((c) => c.move === 40)).toMatchObject({ wonGames: 2, flaggedGames: 0, medianLeftFlagged: null })
+  })
+
+  it('only uses the most common time control in a class', () => {
+    const t = clockTargets([clocked({}, 1, 20), clocked({}, 1, 20), facts({ timeClass: 'bullet', clock: { base: 120, increment: 1, spent: [], left: null, lowest: null } })])
+    expect(t[0]).toMatchObject({ base: 60, games: 2 })
   })
 })
 

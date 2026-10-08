@@ -1,4 +1,5 @@
 import type { Color } from 'chess.js'
+import { estimateRating } from '../review/gameRating'
 import { colorAt, labelAt, moveNumberAt, moverWinPercentBefore, pieceAt, TACTIC, type GameSummary } from '../review/summary'
 import type { Label } from '../review/types'
 import type { GameFacts, PieceType } from './facts'
@@ -90,6 +91,36 @@ export function tactics(games: ReviewedGame[]): Tactics {
       if (f & TACTIC.mateAvailable) f & TACTIC.mateFound ? t.matesFound++ : t.matesMissed++
       if (f & TACTIC.forkAvailable) f & TACTIC.forkFound ? t.forksFound++ : t.forksMissed++
       if (f & TACTIC.hung) t.hungPieces++
+    }
+  }
+  return t
+}
+
+/** A move in a reviewed game: summary index i is review.moves[i], ply summary.firstPly + i. */
+export type MoveRef = { gameId: string; index: number }
+
+/**
+ * The moves behind each tactics() count, so a number can list its positions.
+ * For opponentHung and opponentHungPunished the index is the opponent's move.
+ */
+export function tacticMoments(games: ReviewedGame[]): Record<keyof Tactics, MoveRef[]> {
+  const t: Record<keyof Tactics, MoveRef[]> = { matesFound: [], matesMissed: [], forksFound: [], forksMissed: [], hungPieces: [], opponentHung: [], opponentHungPunished: [] }
+  for (const g of games) {
+    const s = g.summary
+    const me = colorOf(g)
+    const at = (index: number): MoveRef => ({ gameId: s.gameId, index })
+    for (let i = 0; i < s.labels.length; i++) {
+      const f = s.tactics[i]
+      if (colorAt(s, i) !== me) {
+        if (f & TACTIC.hung && i + 1 < s.labels.length) {
+          t.opponentHung.push(at(i))
+          if (GOOD_ENOUGH.includes(labelAt(s, i + 1))) t.opponentHungPunished.push(at(i))
+        }
+        continue
+      }
+      if (f & TACTIC.mateAvailable) (f & TACTIC.mateFound ? t.matesFound : t.matesMissed).push(at(i))
+      if (f & TACTIC.forkAvailable) (f & TACTIC.forkFound ? t.forksFound : t.forksMissed).push(at(i))
+      if (f & TACTIC.hung) t.hungPieces.push(at(i))
     }
   }
   return t
@@ -220,6 +251,58 @@ export function tilt(games: ReviewedGame[], history: GameFacts[]): GameGroup[] {
   ]
 }
 
+export type PlayingLevel = {
+  timeClass: string
+  games: number
+  /**
+   * Mean of each game's blended "played like" rating: the rating going in,
+   * moved by how the game's accuracy compares with typical at that rating.
+   */
+  blended: number | null
+  blendedSd: number | null
+  /** Mean of each game's accuracy-only estimate, which ignores the player's rating */
+  accuracyOnly: number | null
+  accuracyOnlySd: number | null
+  /** Mean rating going into these games, for comparison */
+  ratingBefore: number | null
+  gameIds: string[]
+}
+
+/**
+ * The player's average playing level per time control, from the same model as
+ * a review's "played like" figure (src/review/gameRating.ts), most-played first.
+ * Time controls without a model (daily) are left out. Averaging many games
+ * removes most of the per-game noise, but not the model's own error, so the
+ * accuracy-only figure is still a rough level rather than a rating.
+ */
+export function playingLevel(games: ReviewedGame[]): PlayingLevel[] {
+  const byClass = new Map<string, ReviewedGame[]>()
+  for (const g of games) {
+    const list = byClass.get(g.facts.timeClass)
+    if (list) list.push(g)
+    else byClass.set(g.facts.timeClass, [g])
+  }
+  const out: PlayingLevel[] = []
+  for (const [timeClass, gs] of byClass) {
+    const blended: number[] = []
+    const accuracyOnly: number[] = []
+    const ratings: number[] = []
+    const ids: string[] = []
+    for (const g of gs) {
+      const e = estimateRating(myAccuracy(g), timeClass, g.facts.myRatingBefore)
+      if (!e) continue
+      if (e.blended !== null) blended.push(e.blended)
+      accuracyOnly.push(e.accuracyOnly)
+      ratings.push(g.facts.myRatingBefore)
+      ids.push(g.facts.id)
+    }
+    if (ids.length === 0) continue
+    const b = stats(blended)
+    const a = stats(accuracyOnly)
+    out.push({ timeClass, games: ids.length, blended: b.mean, blendedSd: b.sd, accuracyOnly: a.mean, accuracyOnlySd: a.sd, ratingBefore: stats(ratings).mean, gameIds: ids })
+  }
+  return out.sort((x, y) => y.games - x.games)
+}
 function group(label: string, games: ReviewedGame[]): GameGroup {
   if (games.length === 0) return { label, games: 0, accuracy: null, accuracySd: null, costlyPerGame: null, score: null, gameIds: [] }
   const acc = games.map(myAccuracy)
