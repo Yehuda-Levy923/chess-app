@@ -25,7 +25,7 @@ export async function reviewBatch(
   onProgress: (p: BatchProgress) => void,
   signal?: AbortSignal,
 ): Promise<{ reviews: Review[]; sources: Record<ReviewSource, number> }> {
-  const sources: Record<ReviewSource, number> = { cache: 0, rebuilt: 0, calibration: 0, engine: 0 }
+  const sources: Record<ReviewSource, number> = { cache: 0, rebuilt: 0, deepened: 0, calibration: 0, engine: 0 }
   const reviews: Review[] = []
   const queue = [...games].sort((a, b) => b.endTime - a.endTime)
   for (let i = 0; i < queue.length; i++) {

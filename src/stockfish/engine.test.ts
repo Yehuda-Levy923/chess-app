@@ -13,6 +13,9 @@ class FakeStockfish implements WorkerLike {
   onmessage: ((e: MessageEvent) => void) | null = null
   onerror: ((e: ErrorEvent) => void) | null = null
   sent: string[] = []
+  /** Depth a "go ... movetime" search reaches before its time runs out, once per position */
+  capDepth: number | null = null
+  private capped = false
   private multiPv = 1
   private legal = 20
   private timer: ReturnType<typeof setTimeout> | null = null
@@ -22,8 +25,16 @@ class FakeStockfish implements WorkerLike {
     if (cmd === 'uci') this.emit('uciok')
     else if (cmd === 'isready') this.emit('readyok')
     else if (cmd.startsWith('setoption name MultiPV value')) this.multiPv = Number(cmd.split(' ').at(-1))
-    else if (cmd.startsWith('position fen')) this.legal = cmd.includes(ONE_MOVE) ? 1 : 20
-    else if (cmd.startsWith('go')) this.search(Number(cmd.match(/depth (\d+)/)![1]))
+    else if (cmd.startsWith('position fen')) {
+      this.legal = cmd.includes(ONE_MOVE) ? 1 : 20
+      this.capped = false
+    } else if (cmd.startsWith('go')) {
+      // The first timed search of a position runs out of time at capDepth.
+      const depth = Number(cmd.match(/depth (\d+)/)![1])
+      const cap = this.capDepth !== null && cmd.includes('movetime') && !this.capped
+      this.capped ||= cap
+      this.search(cap ? Math.min(depth, this.capDepth!) : depth)
+    }
     else if (cmd === 'stop') this.finish()
   }
 
@@ -58,6 +69,30 @@ const setup = () => {
   const worker = new FakeStockfish()
   return { worker, engine: new Engine({ worker, multiPv: 2 }) }
 }
+
+describe('Engine.analyse', () => {
+  it('searches on to the minimum depth when the time cap stops it short', async () => {
+    const { engine, worker } = setup()
+    worker.capDepth = 12
+    const result = await engine.analyse(START, 16, 2000, 15)
+    expect(result.depth).toBe(15)
+    expect(result.requestedDepth).toBe(16)
+    expect(worker.sent.filter((c) => c.startsWith('go'))).toEqual(['go depth 16 movetime 2000', 'go depth 15 movetime 30000'])
+  })
+
+  it('searches once when the first search clears the minimum', async () => {
+    const { engine, worker } = setup()
+    worker.capDepth = 15
+    expect((await engine.analyse(START, 16, 2000, 15)).depth).toBe(15)
+    expect(worker.sent.filter((c) => c.startsWith('go'))).toHaveLength(1)
+  })
+
+  it('never asks for more than the requested depth', async () => {
+    const { engine, worker } = setup()
+    worker.capDepth = 8
+    expect((await engine.analyse(START, 12, 2000, 15)).depth).toBe(12)
+  })
+})
 
 describe('Engine.analyseLive', () => {
   it('streams one update per completed depth with every line', async () => {

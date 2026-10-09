@@ -2,7 +2,7 @@ import type { ChessComGame } from '../chesscom/api'
 import { parsePgn, parseTimeControl } from '../insights/pgn'
 import { getBook } from '../openings'
 import type { Engine } from '../stockfish/engine'
-import { analyseGame } from './analyseGame'
+import { analyseGame, shallowPositions, topUpAnalyses } from './analyseGame'
 import { buildReview, movesFromPgn, REVIEW_VERSION, type ClockInput } from './buildReview'
 import { loadReview, saveReview } from './cache'
 import type { PositionAnalysis, Review } from './types'
@@ -16,7 +16,7 @@ export function clockInput(game: Pick<ChessComGame, 'pgn' | 'timeControl'>): Clo
   return { clocks, base: tc.base, increment: tc.increment }
 }
 
-export type ReviewSource = 'cache' | 'rebuilt' | 'calibration' | 'engine'
+export type ReviewSource = 'cache' | 'rebuilt' | 'deepened' | 'calibration' | 'engine'
 
 /**
  * The one way to get a game's review. Uses the cache when it is current;
@@ -32,23 +32,23 @@ export async function reviewGame(
   signal?: AbortSignal,
 ): Promise<{ review: Review; source: ReviewSource }> {
   const cached = await loadReview(game.uuid, depth)
-  if (cached && cached.version === REVIEW_VERSION) return { review: cached, source: 'cache' }
+  const shallow = cached?.analyses ? shallowPositions(cached.analyses).length > 0 : false
+  if (cached && cached.version === REVIEW_VERSION && !shallow) return { review: cached, source: 'cache' }
 
   const moves = movesFromPgn(game.pgn)
   const build = (analyses: PositionAnalysis[]) => buildReview(game.uuid, moves, analyses, getBook(), clockInput(game))
-
-  if (cached?.analyses?.length === moves.length + 1) {
-    const review = build(cached.analyses)
+  // Saved analyses with positions under the depth floor get just those searched again.
+  const reuse = async (analyses: PositionAnalysis[], source: ReviewSource) => {
+    const deeper = await topUpAnalyses(engine, analyses, onProgress, signal)
+    const review = build(deeper ?? analyses)
     await saveReview(review)
-    return { review, source: 'rebuilt' }
+    return { review, source: deeper ? ('deepened' as const) : source }
   }
+
+  if (cached?.analyses?.length === moves.length + 1) return reuse(cached.analyses, 'rebuilt')
 
   const saved = depth === 16 ? await calibrationAnalyses(game.uuid, moves.length + 1) : null
-  if (saved) {
-    const review = build(saved)
-    await saveReview(review)
-    return { review, source: 'calibration' }
-  }
+  if (saved) return reuse(saved, 'calibration')
 
   const analyses = await analyseGame(engine, moves, depth, onProgress, signal)
   const review = build(analyses)

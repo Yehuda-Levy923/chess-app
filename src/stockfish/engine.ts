@@ -4,6 +4,8 @@ import { LineCollector, parseInfo } from './uci'
 
 const WORKER_URL = '/stockfish/stockfish-19.js'
 const DEFAULT_MAX_MS = 2000
+/** Safety cap on the search that tops a position up to the minimum depth, so a pathological position can't hang a review */
+const FLOOR_MAX_MS = 30000
 
 /** The part of a Worker the engine uses, so tests can drive it with a fake. */
 export type WorkerLike = {
@@ -68,18 +70,28 @@ export class Engine {
    * first. The cap matters: on a sharp position a fixed depth can take tens of
    * seconds in WASM.
    */
-  analyse(fen: string, depth: number, maxMs: number = DEFAULT_MAX_MS): Promise<PositionAnalysis> {
+  analyse(fen: string, depth: number, maxMs: number = DEFAULT_MAX_MS, minDepth = 0): Promise<PositionAnalysis> {
     const run = async () => {
       await this.ready
-      const lines = new LineCollector()
       const whiteToMove = fen.split(' ')[1] === 'w'
+      const search = async (go: string) => {
+        const lines = new LineCollector()
+        await this.sendAndWait(go, (l) => {
+          const info = parseInfo(l, whiteToMove)
+          if (info) lines.add(info)
+          return l.startsWith('bestmove')
+        })
+        return lines.result()
+      }
       this.send(`position fen ${fen}`)
-      await this.sendAndWait(`go depth ${depth} movetime ${maxMs}`, (l) => {
-        const info = parseInfo(l, whiteToMove)
-        if (info) lines.add(info)
-        return l.startsWith('bestmove')
-      })
-      return { fen, requestedDepth: depth, ...lines.result() }
+      let result = await search(`go depth ${depth} movetime ${maxMs}`)
+      // The time cap stopped it short of the floor: search on to it. The hash
+      // still holds the first search, so the shallow plies come back at once.
+      if (result.depth < Math.min(minDepth, depth)) {
+        const deeper = await search(`go depth ${Math.min(minDepth, depth)} movetime ${FLOOR_MAX_MS}`)
+        if (deeper.depth >= result.depth) result = deeper
+      }
+      return { fen, requestedDepth: depth, ...result }
     }
     return this.enqueue(run)
   }
