@@ -138,8 +138,8 @@ function AccountSection({ username, depth, onUsername, onDepth }: Account) {
       <label className="sheet-field">
         <span>Engine depth for new reviews</span>
         <select value={depth} onChange={(e) => onDepth(Number(e.target.value))}>
-          <option value={12}>12, quick</option>
-          <option value={16}>16</option>
+          <option value={16}>16, quick</option>
+          <option value={18}>18</option>
           <option value={20}>20, slow</option>
         </select>
       </label>

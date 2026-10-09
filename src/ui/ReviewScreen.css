@@ -844,3 +844,11 @@ kbd {
   color: var(--ink-2);
   font-size: 13px;
 }
+
+/* A label that changed when the live engine searched the position deeper. */
+.coach-deeper {
+  margin-top: 6px !important;
+  padding-left: 36px;
+  font-size: 13px;
+  color: var(--ink);
+}

@@ -31,11 +31,14 @@ function remember(key: string, value: string) {
   }
 }
 
+const LOWEST_DEPTH = 16
+
 const VIEWS: View[] = ['home', 'games', 'practice', 'insights']
 
 export default function App() {
   const [username, setUsername] = useState(() => remembered('username', ''))
-  const [depth, setDepth] = useState(() => Number(remembered('depth', '16')))
+  // Settings offer 16, 18 and 20; an older saved choice below that (12 was once offered) reads as 16.
+  const [depth, setDepth] = useState(() => Math.max(LOWEST_DEPTH, Number(remembered('depth', '16')) || LOWEST_DEPTH))
   const [appearance, setAppearanceState] = useState<Appearance>(loadAppearance)
   const [settingsOpen, setSettingsOpen] = useState(false)
 

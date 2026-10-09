@@ -3,7 +3,8 @@ import { Chess, type PieceSymbol } from 'chess.js'
 import type { Arrow } from 'react-chessboard'
 import type { ChessComGame, ChessComPlayer } from '../chesscom/api'
 import { winPercent } from '../review/accuracy'
-import { classifyPlayedMove, LABELS, terminalScore, type Judgement } from '../review/buildReview'
+import { MIN_REVIEW_DEPTH } from '../review/analyseGame'
+import { classifyPlayedMove, LABELS, movesFromPgn, terminalScore, type Judgement } from '../review/buildReview'
 import { estimateRating } from '../review/gameRating'
 import { phaseGrades, phaseStarts, type PhaseName } from '../review/phases'
 import { reviewGame } from '../review/reviewGame'
@@ -19,10 +20,12 @@ import { GameBoard } from './GameBoard'
 import { captures, checkedKing, clocksFromPgn, formatClock } from './gameInfo'
 import { IconBack, IconBoard, IconPlay, IconExternal, IconFirst, IconFlip, IconKeyNext, IconKeyPrev, IconLast, IconNext, IconPrev, IconRetry } from './icons'
 import { KEY_LABELS, LABEL_TEXT, toneOf } from './labels'
+import { useHistory } from './history'
 import { useLiveAnalysis, type Live } from './liveAnalysis'
 import { MoveList } from './MoveList'
 import { playCue, playMove as soundMove } from './sound'
 import { judge, RetryPanel, type Attempt } from './RetryPanel'
+import { useDeepen } from './useDeepen'
 import './ReviewScreen.css'
 
 type Props = { game: ChessComGame; username: string; depth: number; onBack: () => void; /** Open on this move instead of the start */ startPly?: number | null }
@@ -212,6 +215,16 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
       ? (varMove?.fenAfter ?? mainFen(variation.basePly))
       : mainFen(ply)
   const live = useLiveAnalysis(fen, !!review && engineOn && !retry, memo)
+  // Deeper live searches of game positions update the review itself.
+  const { refreshSummaries } = useHistory()
+  const deepened = useDeepen({ game, review, setReview, ply, live: !variation && !retry ? live : null, onSaved: refreshSummaries })
+  const positions = useMemo(() => {
+    try {
+      return movesFromPgn(game.pgn).length + 1
+    } catch {
+      return 0
+    }
+  }, [game.pgn])
 
   // Sound when a move lands on the board: stepping forward through the game or
   // a line plays it, stepping back stays quiet. A brilliant move gets its own cue.
@@ -257,7 +270,12 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
           {game.white.username} <span className="dim">vs</span> {game.black.username}
         </h1>
         <p className="dim">
-          {progress ? (
+          {progress && total < positions ? (
+            <>
+              Searching {total === 1 ? 'one shallow position' : <><span className="num">{total}</span> shallow positions</>} again to depth {MIN_REVIEW_DEPTH}:{' '}
+              <span className="num">{done}</span> of <span className="num">{total}</span>
+            </>
+          ) : progress ? (
             <>
               Analysing position <span className="num">{done}</span> of <span className="num">{total}</span> at depth {depth}
             </>
@@ -680,6 +698,20 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
                       <span className={`coach-eval num ${evalSide(current)}`}>{formatScore(current.scoreAfter)}</span>
                     </div>
                     {current.note && <p className="coach-note">{current.note}</p>}
+                    {deepened?.ply === ply && (
+                      <p className="coach-deeper">
+                        Searched deeper, to depth <span className="num">{deepened.depth}</span>:{' '}
+                        {deepened.changes.map((c, i) => (
+                          <span key={c.ply}>
+                            {i > 0 && ', '}
+                            {Math.ceil(c.ply / 2)}
+                            {c.ply % 2 === 1 ? '.' : '...'}
+                            {c.san} is now {LABEL_TEXT[c.to].phrase}, was {LABEL_TEXT[c.from].phrase}
+                          </span>
+                        ))}
+                        .
+                      </p>
+                    )}
                     <div className="coach-foot">
                       {current.bestLine && current.bestLine.length > 0 && current.bestUci !== current.uci && (
                         <button className="btn coach-retry" onClick={() => showBestLine(current)} title="Step through it with the arrow keys">
