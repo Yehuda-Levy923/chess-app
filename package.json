@@ -10,7 +10,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "pull-reviews": "node scripts/pull-reviews.mjs"
+    "pull-reviews": "node scripts/pull-reviews.mjs",
+    "share": "node scripts/share.mjs"
   },
   "dependencies": {
     "chess.js": "^1.4.0",

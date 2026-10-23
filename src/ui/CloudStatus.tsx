@@ -16,7 +16,7 @@ function since(iso: string): string {
  */
 export function CloudStatus({ depth }: { depth: number }) {
   const cloud = useCloud()
-  if (!cloud) return null
+  if (!cloud || (!cloud.available && !cloud.imported)) return null
   const { active, syncing, imported, error, unreviewed, left } = cloud
 
   return (

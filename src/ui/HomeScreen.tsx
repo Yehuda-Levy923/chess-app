@@ -213,7 +213,7 @@ export function HomeScreen({ username, onUsername, onOpen, onView, onPractice, d
             )}
           </section>
 
-          {(reviewNext.length > 0 || cloud?.active || cloud?.syncing || cloud?.imported || cloud?.error) && (
+          {(reviewNext.length > 0 || cloud?.active || cloud?.imported || (cloud?.available && (cloud.syncing || cloud.error))) && (
             <section className="home-block">
               <h2>Not reviewed yet</h2>
               <CloudStatus depth={depth} />

@@ -15,6 +15,18 @@ Open http://localhost:5173. `npm run dev` first copies Stockfish's 94 MB network
 
 Checks: `npx tsc --noEmit -p tsconfig.app.json` and `npm test`.
 
+### On Windows, without a terminal
+
+Double-click **Start Game review.bat**. The first time, it installs Node.js if it's missing (through winget, which asks you to confirm), installs the app's packages and adds a "Game review" shortcut to the Desktop. After that, it or the shortcut opens the app.
+
+### Sending it to a friend
+
+```
+npm run share
+```
+
+That writes `game-review.zip` from the last commit: code only, none of your reviews or settings, which live in your browser. Your friend unzips it, double-clicks **Start Game review.bat** and enters their own chess.com username. Windows may warn about a file from the internet the first time: More info, then Run anyway. The GitHub review features need the GitHub CLI and a copy of this repo of their own, so in a shared copy they stay hidden.
+
 ## Insights and opening tree
 
 **Insights** loads a player's whole chess.com history once and caches it month by month in IndexedDB. It covers what chess.com's Insights and Advanced Stats show, where our own data can answer it. These need no engine, so they cover every game:

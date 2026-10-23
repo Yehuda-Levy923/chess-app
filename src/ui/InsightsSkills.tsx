@@ -36,7 +36,7 @@ export function InsightsSkills({ games, onDrill }: Props) {
             <span className="num">{missing.toLocaleString()}</span> of these reviews predate phase data, so they're left out here.
             {cloud?.active ? ' A GitHub run is going; they come in when it finishes.' : ''}
           </p>
-          {cloud && !cloud.active && (
+          {cloud?.available && !cloud.active && (
             <button className="btn" onClick={() => void cloud.resummarize()}>
               Rebuild them on GitHub
             </button>

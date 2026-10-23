@@ -8,10 +8,16 @@ import { useHistory } from './history'
 // Stockfish works. Opening the app downloads and imports whatever finished
 // since last time; while a run is going, its progress is checked every so
 // often and its reviews come in as soon as it's done.
+//
+// It needs the GitHub CLI, signed in, in a clone of the repo. A copy made
+// with `npm run share` has none of that, so there it stays out of sight
+// instead of showing a button that can only fail.
 
 const POLL_MS = 30_000
 
 type Cloud = {
+  /** False until GitHub has answered once; false for good on a copy without it */
+  available: boolean
   runs: CloudRun[] | null
   /** A run that hasn't finished, if any */
   active: CloudRun | null
@@ -37,17 +43,24 @@ export const useCloud = () => useContext(CloudContext)
 export function CloudProvider({ username, children }: { username: string; children: ReactNode }) {
   const { games, summaryById, summariesLoaded, refreshSummaries } = useHistory()
   const [runs, setRuns] = useState<CloudRun[] | null>(null)
+  const [available, setAvailable] = useState(false)
+  const answered = useRef(false)
   const [syncing, setSyncing] = useState(false)
   const [imported, setImported] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [left, setLeft] = useState(0)
   const busy = useRef(false)
 
-  const refreshRuns = useCallback(async () => {
+  const refreshRuns = useCallback(async (): Promise<boolean> => {
     try {
       setRuns(await cloudRuns())
+      answered.current = true
+      setAvailable(true)
+      return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // Before GitHub has ever answered, a failure means it isn't set up here: say nothing.
+      if (answered.current) setError(e instanceof Error ? e.message : String(e))
+      return false
     }
   }, [])
 
@@ -57,7 +70,8 @@ export function CloudProvider({ username, children }: { username: string; childr
     busy.current = true
     setSyncing(true)
     try {
-      await pullFinished()
+      // Without GitHub there's nothing to download, but files copied in by hand still import.
+      if (await refreshRuns()) await pullFinished()
       const done = await importDownloadedReviews()
       if (done && done.reviews > 0) {
         setImported(done.reviews)
@@ -127,8 +141,8 @@ export function CloudProvider({ username, children }: { username: string; childr
   }, [refreshRuns])
 
   const value = useMemo<Cloud>(
-    () => ({ runs, active, syncing, imported, error, unreviewed: unreviewedIds.length, reviewAll, left, resummarize, sync }),
-    [runs, active, syncing, imported, error, unreviewedIds.length, reviewAll, left, resummarize, sync],
+    () => ({ available, runs, active, syncing, imported, error, unreviewed: unreviewedIds.length, reviewAll, left, resummarize, sync }),
+    [available, runs, active, syncing, imported, error, unreviewedIds.length, reviewAll, left, resummarize, sync],
   )
   return <CloudContext.Provider value={value}>{children}</CloudContext.Provider>
 }

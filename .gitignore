@@ -33,3 +33,6 @@ calibration/
 # ci-reviews/ by scripts/pull-reviews.mjs
 ci-out/
 ci-reviews/
+
+# made by `npm run share`, to send to a friend
+game-review.zip
