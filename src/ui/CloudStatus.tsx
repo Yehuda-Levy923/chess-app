@@ -17,7 +17,7 @@ function since(iso: string): string {
 export function CloudStatus({ depth }: { depth: number }) {
   const cloud = useCloud()
   if (!cloud || (!cloud.available && !cloud.imported)) return null
-  const { active, syncing, imported, error, unreviewed, left } = cloud
+  const { active, sent, syncing, imported, error, unreviewed, left } = cloud
 
   return (
     <div className="cloud">
@@ -38,6 +38,8 @@ export function CloudStatus({ depth }: { depth: number }) {
             </div>
           )}
         </>
+      ) : sent ? (
+        <p className="dim">Sent to GitHub. Waiting for the run to start…</p>
       ) : syncing ? (
         <p className="dim">Fetching finished reviews from GitHub…</p>
       ) : unreviewed > 0 ? (

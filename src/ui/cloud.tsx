@@ -21,6 +21,8 @@ type Cloud = {
   runs: CloudRun[] | null
   /** A run that hasn't finished, if any */
   active: CloudRun | null
+  /** A run was just asked for and GitHub hasn't listed it yet */
+  sent: boolean
   /** Downloading or importing finished runs */
   syncing: boolean
   /** What the last import brought in */
@@ -49,6 +51,8 @@ export function CloudProvider({ username, children }: { username: string; childr
   const [imported, setImported] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [left, setLeft] = useState(0)
+  /** A run was asked for and GitHub hasn't listed it yet */
+  const [sent, setSent] = useState(false)
   const busy = useRef(false)
 
   const refreshRuns = useCallback(async (): Promise<boolean> => {
@@ -95,7 +99,8 @@ export function CloudProvider({ username, children }: { username: string; childr
     void sync()
   }, [username, summariesLoaded, sync])
 
-  const active = runs?.find((r) => r.status !== 'completed') ?? null
+  // The run that's going, or else one waiting its turn (a newer one queues behind it).
+  const active = runs?.find((r) => r.status === 'in_progress') ?? runs?.find((r) => r.status !== 'completed') ?? null
 
   // While a run is going: check on it, and import as soon as it finishes.
   const wasActive = useRef<number | null>(null)
@@ -115,34 +120,52 @@ export function CloudProvider({ username, children }: { username: string; childr
     return games.filter((g) => !summaryById.has(g.uuid)).flatMap((g) => numericId(g.url) ?? [])
   }, [games, summaryById, summariesLoaded])
 
+  // GitHub takes anything from a few seconds to a minute to list a run it has
+  // accepted. Until it does, the app would show the button again; check
+  // every few seconds until a run that isn't finished shows up.
+  const untilListed = useCallback(async () => {
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 4000))
+      try {
+        const list = await cloudRuns()
+        setRuns(list)
+        if (list.some((x) => x.status !== 'completed')) break
+      } catch {
+        // keep trying
+      }
+    }
+    setSent(false)
+  }, [])
+
   const reviewAll = useCallback(
     async (depth: number) => {
       setError(null)
       try {
         const r = await sendForReview(unreviewedIds, username, depth)
         setLeft(r.left)
-        // GitHub takes a few seconds to list a new run.
-        setTimeout(() => void refreshRuns(), 4000)
+        setSent(true)
+        await untilListed()
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       }
     },
-    [unreviewedIds, username, refreshRuns],
+    [unreviewedIds, username, untilListed],
   )
 
   const resummarize = useCallback(async () => {
     setError(null)
     try {
       await startResummarize()
-      setTimeout(() => void refreshRuns(), 4000)
+      setSent(true)
+      await untilListed()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [refreshRuns])
+  }, [untilListed])
 
   const value = useMemo<Cloud>(
-    () => ({ available, runs, active, syncing, imported, error, unreviewed: unreviewedIds.length, reviewAll, left, resummarize, sync }),
-    [available, runs, active, syncing, imported, error, unreviewedIds.length, reviewAll, left, resummarize, sync],
+    () => ({ available, runs, active, sent, syncing, imported, error, unreviewed: unreviewedIds.length, reviewAll, left, resummarize, sync }),
+    [available, runs, active, sent, syncing, imported, error, unreviewedIds.length, reviewAll, left, resummarize, sync],
   )
   return <CloudContext.Provider value={value}>{children}</CloudContext.Provider>
 }
