@@ -261,3 +261,61 @@
 .sheet-account .btn {
   height: 36px;
 }
+
+/* GitHub setup: three steps as rows, each saying where it stands. */
+.gh-setup > p {
+  margin: 0 0 10px;
+}
+
+.gh-steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 0;
+  padding: 0;
+}
+
+.gh-steps li {
+  counter-increment: step;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.gh-step-name {
+  flex: 1 1 100%;
+  font-weight: 600;
+}
+
+.gh-step-name::before {
+  content: counter(step) '. ';
+  color: var(--ink-3);
+}
+
+.gh-steps li.done .gh-step-name {
+  color: var(--ink-2);
+}
+
+.gh-step-state {
+  color: var(--ink-2);
+}
+
+.gh-step-note {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.gh-code {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.gh-error {
+  margin-top: 8px;
+  color: var(--tone-blunder);
+}

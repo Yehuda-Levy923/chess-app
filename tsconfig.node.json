@@ -19,5 +19,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "github-plugin.ts"]
+  "include": ["vite.config.ts", "github-plugin.ts", "github-setup.ts"]
 }

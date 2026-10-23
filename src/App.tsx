@@ -70,21 +70,21 @@ export default function App() {
         <div className="firelight" aria-hidden />
         <CloudProvider username={username}>
           <Shell key={username} username={username} depth={depth} onUsername={onUsername} onSettings={() => setSettingsOpen(true)} />
+          {settingsOpen && (
+            <AppearanceSheet
+              onClose={closeSettings}
+              account={{
+                username,
+                depth,
+                onUsername,
+                onDepth: (d) => {
+                  setDepth(d)
+                  remember('depth', String(d))
+                },
+              }}
+            />
+          )}
         </CloudProvider>
-        {settingsOpen && (
-          <AppearanceSheet
-            onClose={closeSettings}
-            account={{
-              username,
-              depth,
-              onUsername,
-              onDepth: (d) => {
-                setDepth(d)
-                remember('depth', String(d))
-              },
-            }}
-          />
-        )}
       </HistoryProvider>
     </AppearanceContext.Provider>
   )

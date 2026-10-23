@@ -37,5 +37,5 @@ ci-reviews/
 # made by `npm run share`, to send to a friend
 game-review.zip
 
-# which GitHub fork a shared copy reviews on, written by "Set up GitHub reviews.bat"
+# which GitHub fork a shared copy reviews on, written when it's set up in Settings
 github-repo.txt

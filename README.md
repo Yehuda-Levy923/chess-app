@@ -27,7 +27,7 @@ npm run share
 
 That writes `game-review.zip` from the last commit: code only, none of your reviews or settings, which live in your browser. Your friend unzips it, double-clicks **Start Game review.bat** and enters their own chess.com username. Windows may warn about a file from the internet the first time: More info, then Run anyway.
 
-To have GitHub review their games too, they double-click **Set up GitHub reviews.bat** once. It installs the GitHub CLI if needed and signs them in (a free GitHub account is enough), forks this repo to their account, turns its review workflow on, stores their chess.com username in it as the `CHESS_USERNAME` variable, and writes `github-repo.txt` so the app uses that fork. Running it again brings the fork up to date. Until it has run, the GitHub features stay hidden in a shared copy.
+To have GitHub review their games too, they open **Settings → Reviews on GitHub** in the app and follow its three steps: install the GitHub CLI, sign in with a one-time code (a free GitHub account is enough), and make their copy, which forks this repo to their account, turns its review workflow on, stores their chess.com username in it as the `CHESS_USERNAME` variable, and writes `github-repo.txt` so the app uses that fork (`github-setup.ts`). Making the copy again brings the fork up to date. Until then, the GitHub features stay hidden in a shared copy.
 
 ## Insights and opening tree
 

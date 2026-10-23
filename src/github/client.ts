@@ -34,3 +34,24 @@ export const startResummarize = () => call<{ started: boolean }>('/resummarize',
 
 /** Downloads every finished run not downloaded before into ci-reviews/. */
 export const pullFinished = () => call<{ log: string[] }>('/pull', {})
+
+/** Where setting up GitHub reviews stands; see github-setup.ts. */
+export type SetupStatus = {
+  cli: boolean
+  login: string | null
+  pending: { code: string; url: string } | null
+  repo: string | null
+  clone: boolean
+  workflow: string | null
+  error: string | null
+}
+
+export const setupStatus = () => call<SetupStatus>('/setup')
+
+export const installCli = () => call<SetupStatus>('/setup/cli', {})
+
+/** Starts GitHub's device sign-in: enter the code at the url. */
+export const startLogin = () => call<{ code: string; url: string }>('/setup/login', {})
+
+/** Forks the app to the signed-in account, turns reviews on, and saves the username there. */
+export const makeFork = (username: string) => call<{ repo: string }>('/setup/fork', { username })

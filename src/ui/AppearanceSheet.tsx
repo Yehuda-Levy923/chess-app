@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { BOARDS, boardById, PIECE_SETS, THEMES, useAppearance, type Appearance, type BoardDef } from './appearance'
 import { GameBoard } from './GameBoard'
+import { GithubSetup } from './GithubSetup'
 import './AppearanceSheet.css'
 
 // A position with every piece type on show, so a set can be judged at a glance.
@@ -110,6 +111,12 @@ export function AppearanceSheet({ onClose, account }: { onClose: () => void; acc
         </section>
 
         {account && <AccountSection {...account} />}
+        {account && (
+          <section className="sheet-section">
+            <h3>Reviews on GitHub</h3>
+            <GithubSetup username={account.username} />
+          </section>
+        )}
       </aside>
     </div>
   )

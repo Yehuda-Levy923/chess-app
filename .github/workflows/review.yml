@@ -46,7 +46,7 @@ concurrency:
 
 env:
   # A fork sets its player with the CHESS_USERNAME repository variable
-  # ("Set up GitHub reviews.bat" does it); only the original repo has a default.
+  # (setting up from the app's Settings does it); only the original repo has a default.
   USERNAME: ${{ inputs.username || vars.CHESS_USERNAME || (github.repository_owner == 'Yehuda-Levy923' && 'yehuda_levy') || '' }}
   SINCE_DAYS: ${{ inputs.since_days || '3' }}
   SHARDS: ${{ inputs.shards || '1' }}
@@ -66,7 +66,7 @@ jobs:
       - name: Check the player is set
         run: |
           if [ -z "$USERNAME" ]; then
-            echo "::error::No chess.com username. Set the CHESS_USERNAME repository variable (Settings, Secrets and variables, Actions, Variables), or run Set up GitHub reviews.bat."
+            echo "::error::No chess.com username. Set the CHESS_USERNAME repository variable (Settings, Secrets and variables, Actions, Variables), or set up GitHub reviews from the app's Settings."
             exit 1
           fi
       - id: list

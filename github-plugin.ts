@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import type { Plugin } from 'vite'
+import { ghCommand, installCli, makeFork, savedRepo, setupStatus, startLogin } from './github-setup.ts'
 import { encodeIds, fitting } from './src/github/gameIds.ts'
 
 // Lets the app hand reviews to the "Review games" GitHub workflow and fetch
@@ -13,6 +14,10 @@ import { encodeIds, fitting } from './src/github/gameIds.ts'
 //   POST /api/github/review       { ids, username, depth }: review these games
 //   POST /api/github/resummarize  rebuild every summary in the current format
 //   POST /api/github/pull         download finished runs into ci-reviews/
+//   GET  /api/github/setup        where setting up stands (github-setup.ts)
+//   POST /api/github/setup/cli    install the GitHub CLI
+//   POST /api/github/setup/login  start a device-code sign-in
+//   POST /api/github/setup/fork   { username }: fork, turn reviews on, save it
 //
 // Any page in the browser can send requests to localhost, so each request has
 // to carry the X-Chess-App header (a cross-site page can't add one without a
@@ -20,17 +25,15 @@ import { encodeIds, fitting } from './src/github/gameIds.ts'
 // it came from, come from this server's own origin.
 //
 // Which repository: github-repo.txt ("owner/name") when it's there, which is
-// how a copy made with `npm run share` points at its owner's fork ("Set up
-// GitHub reviews.bat" writes it); otherwise the git clone the app runs in.
+// how a copy made with `npm run share` points at its owner's fork (setting
+// up from Settings writes it); otherwise the git clone the app runs in.
 
 const WORKFLOW = 'review.yml'
 
 /** `--repo owner/name` from github-repo.txt, or nothing to use the clone's own remote. */
 export function repoArgs(root: string): string[] {
-  const file = join(root, 'github-repo.txt')
-  if (!existsSync(file)) return []
-  const name = readFileSync(file, 'utf8').trim()
-  return /^[\w.-]+\/[\w.-]+$/.test(name) ? ['--repo', name] : []
+  const name = savedRepo(root)
+  return name ? ['--repo', name] : []
 }
 
 type Json = Record<string, unknown> | unknown[]
@@ -76,13 +79,14 @@ export function githubPlugin(): Plugin {
     configureServer(server) {
       const root = server.config.root
       // Every gh command here takes --repo; read the file each time so setting it up needs no restart.
-      const gh = (...args: string[]) => run('gh', [...args, ...repoArgs(root)], root)
+      const gh = (...args: string[]) => run(ghCommand() ?? 'gh', [...args, ...repoArgs(root)], root)
 
       server.middlewares.use('/api/github', async (req, res) => {
         if (!allowed(req)) return send(res, 403, { error: 'Not allowed' })
         try {
           const path = (req.url ?? '').split('?')[0]
           if (req.method === 'GET' && path === '/runs') return send(res, 200, await runs(gh, root))
+          if (req.method === 'GET' && path === '/setup') return send(res, 200, await setupStatus(root))
           if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' })
 
           if (path === '/review') {
@@ -98,6 +102,17 @@ export function githubPlugin(): Plugin {
           if (path === '/resummarize') {
             await gh('workflow', 'run', WORKFLOW, '-f', 'mode=resummarize')
             return send(res, 200, { started: true })
+          }
+          if (path === '/setup/cli') {
+            await installCli(root)
+            return send(res, 200, await setupStatus(root))
+          }
+          if (path === '/setup/login') return send(res, 200, await startLogin(root))
+          if (path === '/setup/fork') {
+            const body = await readBody(req)
+            const username = typeof body.username === 'string' && /^[\w-]{1,40}$/.test(body.username) ? body.username : null
+            if (!username) return send(res, 400, { error: 'Enter your chess.com username first.' })
+            return send(res, 200, await makeFork(root, username))
           }
           if (path === '/pull') {
             const out = await run(process.execPath, ['scripts/pull-reviews.mjs'], root, 15 * 60_000)
