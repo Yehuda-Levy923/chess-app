@@ -26,6 +26,7 @@ import { MoveList } from './MoveList'
 import { playCue, playMove as soundMove } from './sound'
 import { judge, RetryPanel, type Attempt } from './RetryPanel'
 import { useDeepen } from './useDeepen'
+import { sparksFrom } from './fire'
 import './ReviewScreen.css'
 
 type Props = { game: ChessComGame; username: string; depth: number; onBack: () => void; /** Open on this move instead of the start */ startPly?: number | null }
@@ -243,7 +244,14 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
       const m = review.moves[ply - 1]
       if (!m) return
       soundMove(m.san)
-      if (m.label === 'brilliant') setTimeout(() => playCue('brilliant'), 140)
+      // In the Fire theme the square throws sparks; the mark is on the board by then.
+      const mark = () => document.querySelector('.review .gameboard-mark')
+      if (m.label === 'brilliant')
+        setTimeout(() => {
+          playCue('brilliant')
+          sparksFrom(mark(), 56)
+        }, 140)
+      else if (m.label === 'great') setTimeout(() => sparksFrom(mark(), 24), 140)
     }
   }, [ply, variation, review, retry])
 
@@ -432,6 +440,7 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
     judge(retryTarget, sourceSquare, targetSquare).then((a) => {
       setRetry((r) => (r && r.index === index ? { ...r, attempt: a } : r))
       if (a) playCue(a.state === 'right' ? 'right' : 'wrong')
+      if (a?.state === 'right') setTimeout(() => sparksFrom(document.querySelector('.review .gameboard-mark'), 40), 60)
       // A wrong try goes back so the next one starts from the real position.
       if (a?.state === 'wrong') {
         setTimeout(() => setRetry((r) => (r && r.index === index && r.fen === tried.fen ? { ...r, fen: null } : r)), 900)

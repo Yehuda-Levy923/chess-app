@@ -12,6 +12,7 @@ import { useBoardKeys, notForBoard, onScreen } from './keys'
 import { LABEL_TEXT } from './labels'
 import { loadSolved, practiceOrder, practicePool, saveSolved, type Puzzle } from './practice'
 import { judge, type Attempt } from './RetryPanel'
+import { flare, sparksFrom } from './fire'
 import { playCue, playMove } from './sound'
 import './PracticeScreen.css'
 
@@ -96,6 +97,9 @@ export function PracticeScreen({ username, focus, onClearFocus, onOpen }: Props)
           session={session}
           position={`${at + 1} of ${order.length.toLocaleString()}`}
           onResult={(firstTry) => {
+            // Streaks of 3, 5, 10 and every 10 after set the fire going.
+            const streak = firstTry ? session.streak + 1 : 0
+            if (streak === 3 || streak === 5 || (streak > 0 && streak % 10 === 0)) flare()
             setSession((s) => {
               const streak = firstTry ? s.streak + 1 : 0
               return { solved: s.solved + (firstTry ? 1 : 0), tried: s.tried + 1, streak, best: Math.max(s.best, streak) }
@@ -223,6 +227,7 @@ function PuzzleView({ puzzle, game, me, rootRef, session, position, onResult, on
       setAttempt(a)
       if (a?.state === 'right') {
         playCue('right')
+        setTimeout(() => sparksFrom(rootRef.current?.querySelector('.gameboard-mark') ?? null, 40), 60)
         setSolved(true)
         report(wrongs === 0 && !hinted)
       } else {
