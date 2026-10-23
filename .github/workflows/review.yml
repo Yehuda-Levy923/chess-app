@@ -21,9 +21,8 @@ on:
         description: Engine depth
         default: '16'
       username:
-        description: chess.com username
-        default: yehuda_levy
-        required: true
+        description: chess.com username (empty for the CHESS_USERNAME repository variable)
+        default: ''
       since_days:
         description: Only games that ended in the last N days (0 for every game)
         default: '0'
@@ -46,7 +45,9 @@ concurrency:
   group: review-games
 
 env:
-  USERNAME: ${{ inputs.username || 'yehuda_levy' }}
+  # A fork sets its player with the CHESS_USERNAME repository variable
+  # ("Set up GitHub reviews.bat" does it); only the original repo has a default.
+  USERNAME: ${{ inputs.username || vars.CHESS_USERNAME || (github.repository_owner == 'Yehuda-Levy923' && 'yehuda_levy') || '' }}
   SINCE_DAYS: ${{ inputs.since_days || '3' }}
   SHARDS: ${{ inputs.shards || '1' }}
   LIMIT: ${{ inputs.limit || '0' }}
@@ -62,6 +63,12 @@ jobs:
     outputs:
       shards: ${{ steps.list.outputs.shards }}
     steps:
+      - name: Check the player is set
+        run: |
+          if [ -z "$USERNAME" ]; then
+            echo "::error::No chess.com username. Set the CHESS_USERNAME repository variable (Settings, Secrets and variables, Actions, Variables), or run Set up GitHub reviews.bat."
+            exit 1
+          fi
       - id: list
         run: echo "shards=[$(seq -s, 0 $((SHARDS - 1)))]" >> "$GITHUB_OUTPUT"
 

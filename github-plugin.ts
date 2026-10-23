@@ -18,8 +18,20 @@ import { encodeIds, fitting } from './src/github/gameIds.ts'
 // to carry the X-Chess-App header (a cross-site page can't add one without a
 // CORS preflight, which this never answers) and, when the browser says where
 // it came from, come from this server's own origin.
+//
+// Which repository: github-repo.txt ("owner/name") when it's there, which is
+// how a copy made with `npm run share` points at its owner's fork ("Set up
+// GitHub reviews.bat" writes it); otherwise the git clone the app runs in.
 
 const WORKFLOW = 'review.yml'
+
+/** `--repo owner/name` from github-repo.txt, or nothing to use the clone's own remote. */
+export function repoArgs(root: string): string[] {
+  const file = join(root, 'github-repo.txt')
+  if (!existsSync(file)) return []
+  const name = readFileSync(file, 'utf8').trim()
+  return /^[\w.-]+\/[\w.-]+$/.test(name) ? ['--repo', name] : []
+}
 
 type Json = Record<string, unknown> | unknown[]
 
@@ -63,7 +75,8 @@ export function githubPlugin(): Plugin {
     name: 'chess-app-github',
     configureServer(server) {
       const root = server.config.root
-      const gh = (...args: string[]) => run('gh', args, root)
+      // Every gh command here takes --repo; read the file each time so setting it up needs no restart.
+      const gh = (...args: string[]) => run('gh', [...args, ...repoArgs(root)], root)
 
       server.middlewares.use('/api/github', async (req, res) => {
         if (!allowed(req)) return send(res, 403, { error: 'Not allowed' })
@@ -110,9 +123,9 @@ async function runs(gh: (...a: string[]) => Promise<string>, root: string) {
     list.map(async (r) => {
       let jobs: { done: number; total: number } | null = null
       if (r.status !== 'completed') {
-        const view = JSON.parse(await gh('run', 'view', String(r.databaseId), '--json', 'jobs')) as { jobs: { name: string; status: string }[] }
-        // The plan job isn't reviewing anything; count the review jobs.
-        const work = view.jobs.filter((j) => j.name !== 'plan')
+        const view = JSON.parse(await gh('run', 'view', String(r.databaseId), '--json', 'jobs')) as { jobs: { name: string; status: string; conclusion: string }[] }
+        // Count the jobs doing the work: not the plan job, nor the mode's skipped one.
+        const work = view.jobs.filter((j) => j.name !== 'plan' && j.conclusion !== 'skipped')
         jobs = { done: work.filter((j) => j.status === 'completed').length, total: work.length }
       }
       return { id: r.databaseId, status: r.status, conclusion: r.conclusion, event: r.event, createdAt: r.createdAt, updatedAt: r.updatedAt, jobs, downloaded: downloaded.has(r.databaseId) }

@@ -12,16 +12,20 @@ const DIR = 'ci-reviews'
 const DONE = join(DIR, 'downloaded-runs.json')
 mkdirSync(DIR, { recursive: true })
 
+// A copy made with `npm run share` names its fork in github-repo.txt; a clone uses its own remote.
+const repoFile = 'github-repo.txt'
+const repo = existsSync(repoFile) ? readFileSync(repoFile, 'utf8').trim() : null
 const gh = (...a) => execFileSync('gh', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+const onRepo = repo ? ['--repo', repo] : []
 
 const done = new Set(existsSync(DONE) ? JSON.parse(readFileSync(DONE, 'utf8')) : [])
 // Failed runs count too: a run where one job timed out still has the other jobs' reviews.
-const runs = JSON.parse(gh('run', 'list', '--workflow', 'review.yml', '--status', 'completed', '--limit', '200', '--json', 'databaseId,conclusion,createdAt'))
+const runs = JSON.parse(gh('run', 'list', ...onRepo, '--workflow', 'review.yml', '--status', 'completed', '--limit', '200', '--json', 'databaseId,conclusion,createdAt'))
 for (const run of runs) {
   if (done.has(run.databaseId) || (run.conclusion === 'cancelled' && !hasArtifacts(run.databaseId))) continue
   process.stdout.write(`run ${run.databaseId} (${run.createdAt}, ${run.conclusion}): `)
   try {
-    gh('run', 'download', String(run.databaseId), '--dir', join(DIR, `run-${run.databaseId}`))
+    gh('run', 'download', String(run.databaseId), ...onRepo, '--dir', join(DIR, `run-${run.databaseId}`))
     console.log('downloaded')
   } catch (e) {
     // Artifacts expire after 90 days, and a run that failed early has none.
@@ -38,7 +42,7 @@ console.log(`${files.length} review files (${mb.toFixed(1)} MB) listed in ${DIR}
 
 function hasArtifacts(id) {
   try {
-    return JSON.parse(gh('api', `repos/{owner}/{repo}/actions/runs/${id}/artifacts`, '--jq', '.total_count')) > 0
+    return JSON.parse(gh('api', `repos/${repo ?? '{owner}/{repo}'}/actions/runs/${id}/artifacts`, '--jq', '.total_count')) > 0
   } catch {
     return false
   }
