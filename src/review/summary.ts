@@ -1,4 +1,4 @@
-import type { Color } from 'chess.js'
+import { Chess, type Color } from 'chess.js'
 import { pieceOf, type PieceType } from '../insights/facts'
 import { LABELS } from './buildReview'
 import { winPercentFor } from './accuracy'
@@ -125,7 +125,7 @@ export function summarize(review: Review, known: { tactics?: number[] } = {}): G
     opening: review.opening,
     firstPly: review.moves[0]?.ply ?? 1,
     firstColor: review.moves[0]?.color ?? 'w',
-    labels: review.moves.map((m) => LABEL_CODES[LABELS.indexOf(m.label)]).join(''),
+    labels: review.moves.map((m) => LABEL_CODES[LABELS.indexOf(labelOf(m))]).join(''),
     pieces: review.moves.map((m) => pieceOf(m.san)).join(''),
     moveAccuracy: review.moves.map((m) => Math.round(m.accuracy * 10) / 10),
     loss: review.moves.map((m) => Math.round(m.loss * 1000) / 1000),
@@ -135,6 +135,17 @@ export function summarize(review: Review, known: { tactics?: number[] } = {}): G
     phases: [middlegame, endgame],
     phaseAccuracy,
   }
+}
+
+/**
+ * The move's label, with one correction for reviews made before version 4:
+ * the only legal move isn't brilliant, however much it leaves hanging. Newer
+ * reviews never label it so; this lets a summary rebuild fix the older ones
+ * without rebuilding their reviews.
+ */
+function labelOf(m: Review['moves'][number]): Label {
+  if (m.label !== 'brilliant') return m.label
+  return new Chess(m.fenBefore).moves().length === 1 ? 'best' : 'brilliant'
 }
 
 function tacticFlags(review: Review): number[] {

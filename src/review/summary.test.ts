@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from 'vitest'
 import { buildBook } from '../openings/book'
 import { buildReview, movesFromPgn } from './buildReview'
-import { summarize, SUMMARY_FORMAT, TACTIC } from './summary'
+import { labelAt, summarize, SUMMARY_FORMAT, TACTIC } from './summary'
 import type { PositionAnalysis, Score } from './types'
 
 const book = buildBook(['eco\tname\tpgn\nC20\tKing\'s Pawn Game\t1. e4 e5'])
@@ -45,6 +45,17 @@ describe('summarize', () => {
     const s = summarize(pinGame(0), { tactics: Array(8).fill(TACTIC.hung) })
     expect(s.tactics[6]).toBe(TACTIC.hung | TACTIC.pinAvailable | TACTIC.pinFound)
     expect(s.tactics[0]).toBe(TACTIC.hung)
+  })
+
+  it("turns an older review's brilliant only legal move into best, and keeps real ones", () => {
+    const review = pinGame(0)
+    // White's king on h1 is checked by an unprotected queen on g2: Kxg2 is its only legal move.
+    const forced = '7k/8/8/8/8/8/6q1/7K w - - 0 1'
+    review.moves[6] = { ...review.moves[6], label: 'brilliant', fenBefore: forced }
+    review.moves[4] = { ...review.moves[4], label: 'brilliant' }
+    const s = summarize(review)
+    expect(labelAt(s, 6)).toBe('best')
+    expect(labelAt(s, 4)).toBe('brilliant')
   })
 
   it("records where the phases begin and each side's accuracy per phase", () => {

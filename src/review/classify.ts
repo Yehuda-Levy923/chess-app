@@ -39,8 +39,11 @@ export function classify(f: MoveFacts): Label {
   const loss = expectedPointsLoss(f)
   const base = baseLabel(f.isBest, loss)
 
+  // A sacrifice has to be a choice: the only legal move can leave material
+  // hanging (out of check, say) without anyone deciding to give it up.
   if (
     (base === 'best' || base === 'excellent') &&
+    f.legalMoves > 1 &&
     f.sacrifice >= MIN_SACRIFICE &&
     f.wpBefore < ALREADY_WINNING &&
     f.wpAfter >= BRILLIANT_FLOOR

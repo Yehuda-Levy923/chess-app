@@ -39,6 +39,10 @@ describe('classify', () => {
     expect(classify(facts({ isBest: true, sacrifice: 3, wpAfter: 55 }))).toBe('brilliant')
   })
 
+  it("doesn't call the only legal move brilliant, even when it leaves material hanging", () => {
+    expect(classify(facts({ isBest: true, sacrifice: 3, wpAfter: 55, legalMoves: 1 }))).toBe('best')
+  })
+
   it('does not call a sacrifice brilliant when already winning or when it loses', () => {
     expect(classify(facts({ isBest: true, sacrifice: 3, wpBefore: 95, wpAfter: 95 }))).toBe('best')
     expect(classify(facts({ wpBefore: 40, wpAfter: 39, sacrifice: 3 }))).toBe('excellent')

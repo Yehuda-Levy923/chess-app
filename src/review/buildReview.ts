@@ -36,7 +36,7 @@ export function terminalScore(fen: string): Score | null {
 }
 
 /** Bump when ReviewedMove/Review gain derived fields, so cached reviews get rebuilt from their analyses. */
-export const REVIEW_VERSION = 3
+export const REVIEW_VERSION = 4
 
 export type MoveToJudge = {
   color: Color
