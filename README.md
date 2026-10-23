@@ -17,26 +17,20 @@ Checks: `npx tsc --noEmit -p tsconfig.app.json` and `npm test`.
 
 ## Insights and opening tree
 
-**Insights** (button on the start screen) loads a player's whole chess.com history once and caches it month by month in IndexedDB. Most of it needs no engine, so it covers every game:
+**Insights** loads a player's whole chess.com history once and caches it month by month in IndexedDB. It covers what chess.com's Insights and Advanced Stats show, where our own data can answer it. These need no engine, so they cover every game:
 
-- results by opponent rating
-- how games ended
-- the phase they ended in
-- openings and how long you stayed in book
-- castling
-- moves by piece
+- results by opponent rating, how games ended, and the phase they ended in
+- openings, and how long you stay in book
 - clock use
 - results by weekday and hour
+- **Geography:** your score against each opponent country, on a map. Countries come from each opponent's chess.com profile, one request each the first time, then from the cache.
 
-The Engine tab needs Stockfish, so it only covers reviewed games, whether reviewed in the app or imported from the workflow below. It shows:
+These need Stockfish, so they cover reviewed games only, whether reviewed in the app or on GitHub:
 
-- accuracy over time, by move number and by piece
-- the mix of move labels
-- tactics found or missed
-- accuracy by time left on the clock
-- accuracy by opening
-- accuracy by opponent rating
-- accuracy after a win, a loss or a losing streak in the same sitting
+- **Skills:** what your accuracy in the opening, middlegame and endgame plays like as a rating, per time control. chess.com rates you against players of your rating; with no data on other players, this uses the same accuracy-to-rating model as a review's "Played like".
+- **Moves:** move labels, accuracy by move number, pieces, which phase you castled in, and game shapes (in control, comeback, back and forth, let it slip, outplayed, close).
+- **Tactics:** mates, forks and pins found, missed, and allowed to the opponent, pieces left hanging, and every brilliant move, filterable by piece and time control.
+- **Engine:** accuracy over time, by clock, by opening, by opponent rating, and after a win or a loss.
 
 It reads a small summary saved with each review (`src/review/summary.ts`), not the full reviews, so ten thousand reviewed games stay light enough to load.
 
@@ -48,16 +42,12 @@ The **opening tree** shows every move order you've played as White or Black, wit
 
 Reviewing thousands of games in the browser would take days, so the "Review games" workflow (`.github/workflows/review.yml`) does it on GitHub's runners. It uses native Stockfish 19, the same version and settings as the app (depth 16, MultiPV 2, 128 MB hash, one thread per engine), and runs one engine per CPU. `scripts/ci-review.mjs` runs the app's own review code through Vite, so a review made there is the same as one made in the app.
 
+- **From the app:** Home lists how many games have no review, with a button that sends exactly those to GitHub. The dev server starts the run through your signed-in GitHub CLI (`github-plugin.ts`), so no token reaches the browser. The computer can be off while it runs.
 - **Full history:** start the workflow by hand from the Actions tab. It splits the games across parallel jobs (16 by default). The `limit` input caps games per job, for a test run.
 - **New games:** a daily scheduled run reviews games from the last three days.
+- **Resummarize:** rebuilds every summary in the current format from earlier runs' reviews, without Stockfish, when the summary gains fields. Started from Insights, Skills.
 
-The results are kept as workflow artifacts for 90 days. To bring them into the app:
-
-```
-npm run pull-reviews
-```
-
-That downloads every run not downloaded before into `ci-reviews/` (gitignored), using the GitHub CLI. Then open Insights and import them. Import only works under `npm run dev`, which serves that folder.
+The results are kept as workflow artifacts for 90 days. Each time the app opens, it downloads finished runs into `ci-reviews/` (gitignored) and imports them. `npm run pull-reviews` does the download by hand.
 
 The script also runs locally with any UCI engine, e.g. the npm package's build: `node scripts/ci-review.mjs --user <name> --engine node_modules/stockfish/bin/stockfish-19-single.js --limit 2`.
 
@@ -112,6 +102,8 @@ node scripts/rating-fit.mjs    # prints the model JSON to paste into src/review/
 - [react-chessboard](https://github.com/Clariity/react-chessboard), MIT
 - Opening names: [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings), CC0
 - Accuracy formulas: [lichess-org/lila](https://github.com/lichess-org/lila) and [scalachess](https://github.com/lichess-org/scalachess), AGPL-3.0
+- Country outlines: [world-atlas](https://github.com/topojson/world-atlas), ISC, from [Natural Earth](https://www.naturalearthdata.com), public domain
+- ISO 3166 country codes, from [pycountry](https://github.com/pycountry/pycountry)'s tables
 - Piece sets, from lila:
   - cburnett (Colin M.L. Burnett) and merida (Armando Hernandez Marroquin), GPLv2+
   - fantasy (Maurizio Monge), MIT

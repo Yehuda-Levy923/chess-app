@@ -1,4 +1,4 @@
-import { getMeta, saveReviews, setMeta } from './cache'
+import { getMeta, saveReviews, saveSummaries, setMeta } from './cache'
 import { SUMMARY_FORMAT, summarize, type GameSummary } from './summary'
 import type { Review } from './types'
 
@@ -36,21 +36,28 @@ export async function importDownloadedReviews(onProgress: (p: ImportProgress) =>
     const res = await fetch(`/ci-reviews/${todo[i]}`, { signal })
     if (!res.ok) throw new Error(`Couldn't read ${todo[i]} (${res.status}).`)
     let batch: { review: Review; summary: GameSummary }[] = []
+    // Lines with only a summary come from the workflow's resummarize run: newer summaries for reviews already here.
+    let summariesOnly: GameSummary[] = []
+    const flush = async () => {
+      if (batch.length) await saveReviews(batch)
+      if (summariesOnly.length) await saveSummaries(summariesOnly)
+      reviews += batch.length + summariesOnly.length
+      batch = []
+      summariesOnly = []
+      onProgress({ filesDone: i, files: todo.length, reviews })
+    }
     for await (const line of lines(await decompressed(res))) {
       if (signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
-      const entry = JSON.parse(line) as { review: Review; summary: GameSummary }
-      // Files made before a summary format change: rebuild it, reusing the workflow's tactic checks.
-      if ((entry.summary.format ?? 1) < SUMMARY_FORMAT) entry.summary = summarize(entry.review, { tactics: entry.summary.tactics })
-      batch.push(entry)
-      if (batch.length === BATCH) {
-        await saveReviews(batch)
-        reviews += batch.length
-        batch = []
-        onProgress({ filesDone: i, files: todo.length, reviews })
+      const entry = JSON.parse(line) as { review?: Review; summary: GameSummary }
+      if (!entry.review) summariesOnly.push(entry.summary)
+      else {
+        // Files made before a summary format change: rebuild it, reusing the workflow's tactic checks.
+        if ((entry.summary.format ?? 1) < SUMMARY_FORMAT) entry.summary = summarize(entry.review, { tactics: entry.summary.tactics })
+        batch.push({ review: entry.review, summary: entry.summary })
       }
+      if (batch.length + summariesOnly.length >= BATCH) await flush()
     }
-    if (batch.length) await saveReviews(batch)
-    reviews += batch.length
+    await flush()
     imported.add(todo[i])
     await setMeta(IMPORTED, [...imported])
   }

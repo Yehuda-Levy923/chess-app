@@ -3,12 +3,23 @@
 # `npm run pull-reviews` downloads them; Insights imports them.
 #
 # Run it by hand for a full history (split across parallel jobs). The daily
-# schedule reviews only games from the last three days.
+# schedule reviews only games from the last three days. The app starts runs
+# for the games it has no review of (game_ids), and resummarize runs rebuild
+# every earlier run's summaries in the current format without Stockfish.
 name: Review games
 
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: review, or resummarize to rebuild summaries from earlier runs' reviews
+        default: review
+      game_ids:
+        description: Only these games, as encoded by src/github/gameIds.ts (empty for since_days)
+        default: ''
+      depth:
+        description: Engine depth
+        default: '16'
       username:
         description: chess.com username
         default: yehuda_levy
@@ -27,6 +38,8 @@ on:
 
 permissions:
   contents: read
+  # Resummarize downloads earlier runs' artifacts.
+  actions: read
 
 # A daily run waits for a long manual run instead of racing it.
 concurrency:
@@ -37,11 +50,14 @@ env:
   SINCE_DAYS: ${{ inputs.since_days || '3' }}
   SHARDS: ${{ inputs.shards || '1' }}
   LIMIT: ${{ inputs.limit || '0' }}
+  GAME_IDS: ${{ inputs.game_ids || '' }}
+  DEPTH: ${{ inputs.depth || '16' }}
   STOCKFISH_URL: https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-x86-64-universal.tar.gz
   STOCKFISH_SHA256: 9defc0d4e55d49c65a6d042f3e571a39fcea499ade6dbe741b53b8c65e03611f
 
 jobs:
   plan:
+    if: ${{ inputs.mode != 'resummarize' }}
     runs-on: ubuntu-latest
     outputs:
       shards: ${{ steps.list.outputs.shards }}
@@ -76,11 +92,40 @@ jobs:
         run: >
           node scripts/ci-review.mjs --user "$USERNAME" --engine "$ENGINE"
           --shard ${{ matrix.shard }} --shards "$SHARDS" --since-days "$SINCE_DAYS"
-          --limit "$LIMIT" --max-minutes 330 --out ci-out
+          --ids "$GAME_IDS" --depth "$DEPTH" --limit "$LIMIT" --max-minutes 330 --out ci-out
       - uses: actions/upload-artifact@v7
         with:
           name: reviews-shard${{ matrix.shard }}
           path: ci-out/
           retention-days: 90
           # The reviews are gzipped already.
+          compression-level: 0
+
+  resummarize:
+    if: ${{ inputs.mode == 'resummarize' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Download earlier runs' reviews
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p prev
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow review.yml --status completed --limit 300 --json databaseId --jq '.[].databaseId' |
+            while read -r id; do
+              gh run download "$id" --repo "$GITHUB_REPOSITORY" --dir "prev/run-$id" --pattern 'reviews-*' || echo "run $id: nothing to download"
+            done
+      - name: Rebuild summaries
+        run: node scripts/ci-resummarize.mjs --in prev --out ci-out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: summaries
+          path: ci-out/
+          retention-days: 90
           compression-level: 0

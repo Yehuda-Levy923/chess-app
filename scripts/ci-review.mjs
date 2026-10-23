@@ -4,10 +4,15 @@
 // too with any UCI engine.
 //
 //   node scripts/ci-review.mjs --user <name> --engine <path> [--shard 0 --shards 1]
-//     [--since-days 0] [--limit 0] [--jobs <cpus>] [--max-minutes 0] [--out ci-out]
+//     [--since-days 0] [--ids <encoded>] [--depth 16] [--limit 0] [--jobs <cpus>]
+//     [--max-minutes 0] [--out ci-out]
+//
+// --ids picks particular games (the app sends the ones it has no review for),
+// encoded by src/github/gameIds.ts; without it, --since-days decides.
 //
 // Engine settings match the app: 1 thread and 128 MB hash per engine, MultiPV 2,
-// depth 16 with the 2 s cap. One engine runs per CPU, each on its own game.
+// the requested depth (16 by default) with the 2 s cap and the depth-15 floor.
+// One engine runs per CPU, each on its own game.
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs'
@@ -25,6 +30,8 @@ const { values: args } = parseArgs({
     shard: { type: 'string', default: '0' },
     shards: { type: 'string', default: '1' },
     'since-days': { type: 'string', default: '0' },
+    ids: { type: 'string', default: '' },
+    depth: { type: 'string', default: '16' },
     limit: { type: 'string', default: '0' },
     jobs: { type: 'string', default: String(availableParallelism()) },
     'max-minutes': { type: 'string', default: '0' },
@@ -33,7 +40,7 @@ const { values: args } = parseArgs({
 })
 if (!args.user || !args.engine) throw new Error('usage: node scripts/ci-review.mjs --user <name> --engine <path> [options]')
 
-const DEPTH = 16
+const DEPTH = Number(args.depth) || 16
 const shard = Number(args.shard)
 const shards = Number(args.shards)
 const sinceDays = Number(args['since-days'])
@@ -52,10 +59,12 @@ const { clockInput } = await load('/src/review/reviewGame.ts')
 const { summarize } = await load('/src/review/summary.ts')
 const { getBook } = await load('/src/openings/index.ts')
 const { Engine } = await load('/src/stockfish/engine.ts')
+const { decodeIds, numericId } = await load('/src/github/gameIds.ts')
 
 const all = await loadGames(args.user)
 const since = sinceDays > 0 ? Date.now() / 1000 - sinceDays * 86400 : 0
-let games = all.filter((g) => g.endTime >= since && shardOf(g.uuid) === shard)
+const wanted = args.ids ? new Set(decodeIds(args.ids)) : null
+let games = all.filter((g) => (wanted ? wanted.has(numericId(g.url)) : g.endTime >= since) && shardOf(g.uuid) === shard)
 if (limit > 0) games = games.slice(0, limit)
 console.log(`shard ${shard}/${shards}: ${games.length} games (of ${all.length}), ${jobs} engines`)
 

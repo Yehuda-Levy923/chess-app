@@ -1,4 +1,4 @@
-import { SUMMARY_FORMAT, summarize, type GameSummary } from './summary'
+import { MIN_SUMMARY_FORMAT, summarize, type GameSummary } from './summary'
 import type { Review } from './types'
 
 // Finished reviews, keyed by chess.com game uuid and depth, so reopening a game
@@ -96,6 +96,26 @@ export async function saveReviews(entries: { review: Review; summary: GameSummar
 }
 
 /**
+ * Replaces summaries without touching their reviews, e.g. ones the review
+ * workflow rebuilt in a newer format. A summary whose review isn't cached is
+ * skipped: the game list opens reviews by the summary's key.
+ */
+export async function saveSummaries(summaries: GameSummary[]): Promise<number> {
+  const db = await open()
+  const reviewKeys = new Set(await request(db.transaction(REVIEWS).objectStore(REVIEWS).getAllKeys()))
+  const tx = db.transaction(SUMMARIES, 'readwrite')
+  let saved = 0
+  for (const s of summaries) {
+    const k = key(s.gameId, s.depth)
+    if (!reviewKeys.has(k)) continue
+    tx.objectStore(SUMMARIES).put(s, k)
+    saved++
+  }
+  await done(tx)
+  return saved
+}
+
+/**
  * One summary per reviewed game. A game reviewed at two depths is cached twice;
  * the newest review version wins, then the deeper one.
  */
@@ -111,7 +131,7 @@ export async function allSummaries(): Promise<GameSummary[]> {
     // Summaries in an older format are rebuilt from their reviews, keeping the tactic flags.
     const current = new Map<IDBValidKey, GameSummary>()
     const outdated = new Map<IDBValidKey, GameSummary>()
-    stored.forEach((s, i) => ((s.format ?? 1) >= SUMMARY_FORMAT ? current : outdated).set(summaryKeys[i], s))
+    stored.forEach((s, i) => ((s.format ?? 1) >= MIN_SUMMARY_FORMAT ? current : outdated).set(summaryKeys[i], s))
     const summaries = [...current.values()]
     for (const k of reviewKeys.filter((k) => !current.has(k))) {
       const review = (await request(db.transaction(REVIEWS).objectStore(REVIEWS).get(k))) as Review | undefined

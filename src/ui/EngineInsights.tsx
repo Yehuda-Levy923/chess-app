@@ -4,28 +4,19 @@ import {
   accuracyByOpening,
   accuracyByRatingGap,
   accuracyOverTime,
-  moveQuality,
   playingLevel,
-  tacticMoments,
-  tactics,
   tilt,
   type GameGroup,
-  type MoveRef,
   type MoveBand,
   type PlayingLevel,
   type ReviewedGame,
 } from '../insights/engineStats'
 import type { GameFacts } from '../insights/facts'
 import type { BatchProgress } from '../review/batch'
-import { LABELS } from '../review/buildReview'
-import { colorAt, labelAt } from '../review/summary'
-import type { Label } from '../review/types'
-import { Badge } from './Badge'
 import { LineChart, PerfBar } from './charts'
 import { formatDate } from './dates'
 import { derived } from './derived'
 import type { Drill } from './GamesDrawer'
-import { GLYPH, LABEL_TEXT } from './labels'
 
 type Props = {
   games: ReviewedGame[]
@@ -110,9 +101,6 @@ export function EngineInsights({ games, totalGames, history, unreviewed, batch, 
     afterResult: tilt(games, history),
     byOpening: accuracyByOpening(games, { minGames: 30 }),
     byGap: accuracyByRatingGap(games),
-    quality: moveQuality(games),
-    t: tactics(games),
-    tm: tacticMoments(games),
     level: playingLevel(games),
   }))
   const mean = stats.over.reduce((s, p) => s + p.ours, 0) / Math.max(1, stats.over.length)
@@ -126,39 +114,6 @@ export function EngineInsights({ games, totalGames, history, unreviewed, batch, 
   const bestOpenings = scored.filter((x) => x.z > 0).sort((a, b) => b.z - a.z).slice(0, 6).map((x) => x.g)
   const facts = new Map(games.map((g) => [g.facts.id, g.facts]))
   const drill = (title: string, ids: string[]) => onDrill({ title, games: ids.flatMap((id) => facts.get(id) ?? []) })
-
-  // Individual moves: each opens its game's review on that move.
-  const reviewed = new Map(games.map((g) => [g.facts.id, g]))
-  const drillMoves = (title: string, refs: MoveRef[]) => {
-    const ids = [...new Set(refs.map((r) => r.gameId))]
-    onDrill({
-      title,
-      games: ids.flatMap((id) => facts.get(id) ?? []),
-      moments: refs.flatMap((r) => {
-        const g = reviewed.get(r.gameId)
-        return g ? [{ id: r.gameId, ply: g.summary.firstPly + r.index }] : []
-      }),
-    })
-  }
-  const labelled = (label: Label): MoveRef[] =>
-    games.flatMap((g) => {
-      const mine = g.facts.side === 'white' ? 'w' : 'b'
-      const s = g.summary
-      const out: MoveRef[] = []
-      for (let i = 0; i < s.labels.length; i++) if (colorAt(s, i) === mine && labelAt(s, i) === label) out.push({ gameId: g.facts.id, index: i })
-      return out
-    })
-  const key = (r: MoveRef) => `${r.gameId}:${r.index}`
-  const punished = new Set(stats.tm.opponentHungPunished.map(key))
-  const unpunished = stats.tm.opponentHung.filter((r) => !punished.has(key(r)))
-  const count = (title: string, refs: MoveRef[]) =>
-    refs.length ? (
-      <button className="link-button num" onClick={() => drillMoves(title, refs)}>
-        {refs.length.toLocaleString()}
-      </button>
-    ) : (
-      <span className="num">0</span>
-    )
 
   return (
     <div className="engine-tab">
@@ -231,61 +186,6 @@ export function EngineInsights({ games, totalGames, history, unreviewed, batch, 
           <h2>Against stronger and weaker opponents</h2>
           <GroupRows groups={stats.byGap} mean={mean} onPick={(g) => drill(`Opponents ${g.label}, reviewed games`, g.gameIds)} />
 
-          <h2>Move quality</h2>
-          <table className="itable quality perf-rows">
-            <tbody>
-              {LABELS.filter((l) => stats.quality.get(l)).map((l) => (
-                <tr
-                  key={l}
-                  tabIndex={0}
-                  title={`List your ${LABEL_TEXT[l].name.toLowerCase()} moves`}
-                  onClick={() => drillMoves(`Your ${LABEL_TEXT[l].name.toLowerCase()} moves`, labelled(l))}
-                  onKeyDown={(e) => e.key === 'Enter' && drillMoves(`Your ${LABEL_TEXT[l].name.toLowerCase()} moves`, labelled(l))}
-                >
-                  <td className="label-cell">
-                    {GLYPH[l] ? <Badge label={l} size={15} /> : <span className="badge-space" />}
-                    {LABEL_TEXT[l].name}
-                  </td>
-                  <td className="r num">{((stats.quality.get(l) ?? 0) * 100).toFixed(1)}%</td>
-                  <td className="bar-cell">
-                    <span className="sharebar" style={{ width: `${Math.min(100, (stats.quality.get(l) ?? 0) * 200)}%` }} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <h2>Tactics</h2>
-          <table className="itable">
-            <thead>
-              <tr>
-                <th />
-                <th className="r">Found</th>
-                <th className="r">Missed</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Forced mates</td>
-                <td className="r">{count('Forced mates you found', stats.tm.matesFound)}</td>
-                <td className="r">{count('Forced mates you missed', stats.tm.matesMissed)}</td>
-              </tr>
-              <tr>
-                <td>Forks</td>
-                <td className="r">{count('Forks you found', stats.tm.forksFound)}</td>
-                <td className="r">{count('Forks you missed', stats.tm.forksMissed)}</td>
-              </tr>
-              <tr>
-                <td>Pieces your opponent left hanging</td>
-                <td className="r">{count('Hanging pieces you took', stats.tm.opponentHungPunished)}</td>
-                <td className="r">{count('Hanging pieces you left', unpunished)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p className="dim note">
-            You left material hanging {count('Times you left material hanging', stats.tm.hungPieces)} {stats.t.hungPieces === 1 ? 'time' : 'times'}. A fork or mate counts as
-            available when it was the engine's first choice.
-          </p>
         </div>
       </div>
     </div>

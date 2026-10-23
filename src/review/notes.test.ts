@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowsFork, allowsMate, coachNote, hangs, missedMate, missedWin } from './notes'
+import { allowsFork, allowsMate, coachNote, hangs, makesPin, missedMate, missedWin } from './notes'
 
 describe('coach note detectors', () => {
   it('spots a piece left to be taken', () => {
@@ -74,5 +74,27 @@ describe('coachNote', () => {
         opening: 'French Defense',
       }),
     ).toBe('Book move. French Defense.')
+  })
+})
+
+describe('makesPin', () => {
+  it('finds a piece pinned to the king', () => {
+    // 4.Bb5 with d7 empty: the knight on c6 can't move without exposing the king.
+    expect(makesPin('r1bqkbnr/ppp2ppp/2np4/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 4', 'f1b5')).toEqual({ pinned: 'knight', behind: 'king' })
+  })
+
+  it('finds a piece pinned to something worth more', () => {
+    // Rook to e1 looks through the knight on e5 at the queen on e8.
+    expect(makesPin('4q1k1/8/8/4n3/8/8/8/R5K1 w - - 0 1', 'a1e1')).toEqual({ pinned: 'knight', behind: 'queen' })
+  })
+
+  it('ignores a piece with only something cheaper behind it', () => {
+    // 3.Bb5 with the d7 pawn still home: nothing is pinned.
+    expect(makesPin('r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', 'f1b5')).toBeNull()
+  })
+
+  it('ignores pawns in front and moves by non-sliding pieces', () => {
+    expect(makesPin('4k3/4p3/8/8/8/8/8/R5K1 w - - 0 1', 'a1e1')).toBeNull()
+    expect(makesPin('r1bqkbnr/ppp2ppp/2np4/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 4', 'f3g5')).toBeNull()
   })
 })

@@ -3,6 +3,7 @@ import type { ChessComGame } from './chesscom/api'
 import { AppearanceContext, applyTheme, loadAppearance, saveAppearance, type Appearance } from './ui/appearance'
 import { AppearanceSheet } from './ui/AppearanceSheet'
 import { GamesScreen } from './ui/GamesScreen'
+import { CloudProvider } from './ui/cloud'
 import { HistoryProvider, useHistory } from './ui/history'
 import { HomeScreen } from './ui/HomeScreen'
 import { InsightsScreen } from './ui/InsightsScreen'
@@ -66,7 +67,10 @@ export default function App() {
   return (
     <AppearanceContext.Provider value={ctx}>
       <HistoryProvider username={username}>
-        <Shell key={username} username={username} depth={depth} onUsername={onUsername} onSettings={() => setSettingsOpen(true)} />
+        <div className="firelight" aria-hidden />
+        <CloudProvider username={username}>
+          <Shell key={username} username={username} depth={depth} onUsername={onUsername} onSettings={() => setSettingsOpen(true)} />
+        </CloudProvider>
         {settingsOpen && (
           <AppearanceSheet
             onClose={closeSettings}
@@ -161,11 +165,11 @@ function Shell({ username, depth, onUsername, onSettings }: ShellProps) {
       <div className="shell" hidden={!!game}>
         <Sidebar view={view} onView={setView} username={username} rating={username ? rating : null} onSettings={onSettings} />
         <div className="shell-main">
-          {page('home', <HomeScreen username={username} onUsername={onUsername} onOpen={openGame} onView={setView} onPractice={practise} />)}
+          {page('home', <HomeScreen username={username} onUsername={onUsername} onOpen={openGame} onView={setView} onPractice={practise} depth={depth} />)}
           {username && page('games', <GamesScreen username={username} onOpen={openGame} />)}
           {username && page('practice', <PracticeScreen username={username} focus={practiceFocus} onClearFocus={() => setPracticeFocus(null)} onOpen={openGame} />)}
           {username && page('insights', <InsightsScreen username={username} onOpen={openGame} />)}
-          {!username && view !== 'home' && <HomeScreen username="" onUsername={onUsername} onOpen={openGame} onView={setView} onPractice={practise} />}
+          {!username && view !== 'home' && <HomeScreen username="" onUsername={onUsername} onOpen={openGame} onView={setView} onPractice={practise} depth={depth} />}
         </div>
       </div>
     </>

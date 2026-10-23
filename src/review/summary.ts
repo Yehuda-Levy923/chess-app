@@ -1,8 +1,10 @@
 import type { Color } from 'chess.js'
 import { pieceOf, type PieceType } from '../insights/facts'
 import { LABELS } from './buildReview'
+import { winPercentFor } from './accuracy'
 import { mateFor } from './format'
-import { allowsFork, hangs } from './notes'
+import { allowsFork, hangs, makesPin } from './notes'
+import { phaseGrades, phaseStarts } from './phases'
 import type { Label, Review, Score } from './types'
 
 // A review reduced to what the insights read, about 2 KB a game instead of
@@ -10,8 +12,17 @@ import type { Label, Review, Score } from './types'
 // (which take a few milliseconds a move) worked out once when the review is
 // saved, not every time the Insights screen opens.
 
-/** Bump when the summary gains fields; older summaries are rebuilt from their reviews. */
-export const SUMMARY_FORMAT = 2
+/** Bump when the summary gains fields. */
+export const SUMMARY_FORMAT = 3
+
+/**
+ * Summaries older than this are rebuilt from their reviews. Format 2 lacks
+ * only what format 3 added (pins and phases), so it stays: rebuilding ten
+ * thousand summaries means reading every full review back out of the cache.
+ * The review workflow's resummarize run brings them up to date instead, and
+ * insights that need the newer fields use only the summaries that have them.
+ */
+export const MIN_SUMMARY_FORMAT = 2
 
 export type GameSummary = {
   /** Missing on the first format */
@@ -38,6 +49,10 @@ export type GameSummary = {
   tactics: number[]
   /** White's win percent before the first move, then after each ply, rounded */
   winPercent: number[]
+  /** Format 3: where the middlegame and endgame begin, as ply indexes, null when the game never got there */
+  phases?: [number | null, number | null]
+  /** Format 3: each side's accuracy in the opening, middlegame and endgame, null under two moves */
+  phaseAccuracy?: { w: (number | null)[]; b: (number | null)[] }
 }
 
 export const TACTIC = {
@@ -50,7 +65,14 @@ export const TACTIC = {
   forkFound: 8,
   /** A bad move that left material to be won */
   hung: 16,
+  /** Format 3: the best move pinned a piece and stood clearly above the second-best */
+  pinAvailable: 32,
+  pinFound: 64,
 } as const
+
+const PIN_BITS = TACTIC.pinAvailable | TACTIC.pinFound
+/** How far the best move has to stand above the second-best, in win percent, to count as a pin to find. */
+const PIN_MARGIN = 10
 
 // One letter per entry of LABELS, in the same order.
 const LABEL_CODES = 'BGbegkimMx'
@@ -84,7 +106,16 @@ export function moverWinPercentBefore(s: GameSummary, i: number): number {
  * so a summary can be brought up to date without redoing the slow checks.
  */
 export function summarize(review: Review, known: { tactics?: number[] } = {}): GameSummary {
-  const flags = known.tactics?.length === review.moves.length ? known.tactics : tacticFlags(review)
+  // Flags from an older summary keep their slow checks; the pin check is quick and always redone.
+  const flags =
+    known.tactics?.length === review.moves.length ? known.tactics.map((f, i) => (f & ~PIN_BITS) | pinFlags(review, i)) : tacticFlags(review)
+  const { middlegame, endgame } = phaseStarts(review)
+  const grades = phaseGrades(review)
+  const round = (x: number | undefined) => (x === undefined ? null : Math.round(x * 10) / 10)
+  const phaseAccuracy = {
+    w: [round(grades.w.opening?.accuracy), round(grades.w.middlegame?.accuracy), round(grades.w.endgame?.accuracy)],
+    b: [round(grades.b.opening?.accuracy), round(grades.b.middlegame?.accuracy), round(grades.b.endgame?.accuracy)],
+  }
   return {
     format: SUMMARY_FORMAT,
     gameId: review.gameId,
@@ -101,19 +132,35 @@ export function summarize(review: Review, known: { tactics?: number[] } = {}): G
     clock: review.moves.map((m) => m.clock ?? null),
     tactics: flags,
     winPercent: [review.initialWinPercent, ...review.moves.map((m) => m.winPercentAfter)].map(Math.round),
+    phases: [middlegame, endgame],
+    phaseAccuracy,
   }
 }
 
 function tacticFlags(review: Review): number[] {
-  return review.moves.map((m) => {
+  return review.moves.map((m, i) => {
     const them: Color = m.color === 'w' ? 'b' : 'w'
     const ok = GOOD_ENOUGH.includes(m.label)
     let f = 0
     if (mateFor(m.scoreBest, m.color) !== null) f |= TACTIC.mateAvailable | (ok && stillMating(m.scoreAfter, m.color) ? TACTIC.mateFound : 0)
     if (m.bestUci && allowsFork(m.fenBefore, m.bestUci, them)) f |= TACTIC.forkAvailable | (ok ? TACTIC.forkFound : 0)
     if (BAD.includes(m.label) && hangs(m.fenAfter, m.color)) f |= TACTIC.hung
-    return f
+    return f | pinFlags(review, i)
   })
+}
+
+/**
+ * A pin to find: the engine's move pins something, it isn't a book move, and
+ * the second-best move is clearly worse, so the pin was the point. Reviews
+ * without the stored engine lines can't tell, so they get no pin flags.
+ */
+function pinFlags(review: Review, i: number): number {
+  const m = review.moves[i]
+  const lines = review.analyses?.[i]?.lines
+  if (!m.bestUci || m.label === 'book' || !lines?.[1]) return 0
+  if (winPercentFor(lines[0].score, m.color) - winPercentFor(lines[1].score, m.color) < PIN_MARGIN) return 0
+  if (!makesPin(m.fenBefore, m.bestUci)) return 0
+  return TACTIC.pinAvailable | (GOOD_ENOUGH.includes(m.label) ? TACTIC.pinFound : 0)
 }
 
 /** Still on course for mate after the move, or the move itself was mate. */

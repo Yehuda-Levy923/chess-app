@@ -11,21 +11,29 @@ import { InsightsActivity } from './InsightsActivity'
 import { InsightsClock } from './InsightsClock'
 import { InsightsOpenings } from './InsightsOpenings'
 import { InsightsResults } from './InsightsResults'
+import { InsightsGeography } from './InsightsGeography'
+import { InsightsMoves } from './InsightsMoves'
+import { InsightsSkills } from './InsightsSkills'
 import { InsightsSummary } from './InsightsSummary'
+import { InsightsTactics } from './InsightsTactics'
 import { useHistory } from './history'
 import { ImportReviews } from './ImportReviews'
 import './InsightsScreen.css'
 
 type Props = { username: string; onOpen: (game: ChessComGame, ply?: number) => void }
 
-type Tab = 'summary' | 'openings' | 'results' | 'clock' | 'activity' | 'engine'
+type Tab = 'summary' | 'skills' | 'openings' | 'results' | 'moves' | 'tactics' | 'clock' | 'activity' | 'geography' | 'engine'
 
 const TABS: { id: Tab; name: string }[] = [
   { id: 'summary', name: 'Summary' },
+  { id: 'skills', name: 'Skills' },
   { id: 'openings', name: 'Openings' },
   { id: 'results', name: 'Results' },
+  { id: 'moves', name: 'Moves' },
+  { id: 'tactics', name: 'Tactics' },
   { id: 'clock', name: 'Clock' },
   { id: 'activity', name: 'Activity' },
+  { id: 'geography', name: 'Geography' },
   { id: 'engine', name: 'Engine' },
 ]
 
@@ -216,6 +224,14 @@ export function InsightsScreen({ username, onOpen }: Props) {
             />
           ) : tab === 'activity' ? (
             <InsightsActivity games={shown} onDrill={setDrill} />
+          ) : tab === 'skills' ? (
+            <InsightsSkills games={shownReviewed} onDrill={setDrill} />
+          ) : tab === 'moves' ? (
+            <InsightsMoves games={shownReviewed} onDrill={setDrill} />
+          ) : tab === 'tactics' ? (
+            <InsightsTactics games={shownReviewed} onDrill={setDrill} />
+          ) : tab === 'geography' ? (
+            <InsightsGeography games={shown} history={facts} onDrill={setDrill} />
           ) : (
             <>
               <ImportReviews hasReviews={summaries.length > 0} onImported={refreshReviewed} />

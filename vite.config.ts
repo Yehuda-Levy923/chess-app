@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
+import { githubPlugin } from './github-plugin.ts'
 
 // Multi-threaded Stockfish needs SharedArrayBuffer, which browsers only expose
 // to cross-origin isolated pages.
@@ -9,7 +10,7 @@ const isolationHeaders = {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), githubPlugin()],
   server: { headers: isolationHeaders },
   preview: { headers: isolationHeaders },
   test: {

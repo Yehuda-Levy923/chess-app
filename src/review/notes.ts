@@ -1,4 +1,4 @@
-import { Chess, type Color, type Square } from 'chess.js'
+import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js'
 import { formatScore, mateFor, uciToSan } from './format'
 import { PIECE_NAME, PIECE_VALUE, mostHanging, see } from './material'
 import type { Label, Score } from './types'
@@ -112,4 +112,47 @@ export function missedWin(fenBefore: string, bestUci: string | null, bestSan: st
 function listOf(items: string[]): string {
   if (items.length <= 2) return items.join(' and ')
   return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
+}
+
+const LINES: Record<'b' | 'r', [number, number][]> = {
+  b: [[1, 1], [1, -1], [-1, 1], [-1, -1]],
+  r: [[1, 0], [-1, 0], [0, 1], [0, -1]],
+}
+
+/**
+ * The pin the move makes, if any: after it, the moved bishop, rook or queen
+ * looks through one of the opponent's pieces (not a pawn) at their king or at
+ * something worth more. Only pins by the piece that moved count, so a pin
+ * that was already on the board isn't credited to the move.
+ */
+export function makesPin(fenBefore: string, uci: string): { pinned: string; behind: string } | null {
+  const chess = new Chess(fenBefore)
+  let move
+  try {
+    move = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] })
+  } catch {
+    return null
+  }
+  const pinner = chess.get(move.to)
+  if (!pinner || !(pinner.type === 'b' || pinner.type === 'r' || pinner.type === 'q')) return null
+  const dirs = pinner.type === 'q' ? [...LINES.b, ...LINES.r] : LINES[pinner.type]
+  const file0 = move.to.charCodeAt(0) - 97
+  const rank0 = Number(move.to[1]) - 1
+  const at = (f: number, r: number) => (f < 0 || f > 7 || r < 0 || r > 7 ? undefined : (chess.get(`${String.fromCharCode(97 + f)}${r + 1}` as Square) ?? null))
+  for (const [df, dr] of dirs) {
+    let f = file0 + df
+    let r = rank0 + dr
+    let first: { type: PieceSymbol; color: Color } | null = null
+    for (let cell = at(f, r); cell !== undefined; f += df, r += dr, cell = at(f, r)) {
+      if (!cell) continue
+      if (!first) {
+        if (cell.color === pinner.color || cell.type === 'k' || cell.type === 'p') break
+        first = cell
+        continue
+      }
+      if (cell.color === first.color && PIECE_VALUE[cell.type] > PIECE_VALUE[first.type]) return { pinned: PIECE_NAME[first.type], behind: PIECE_NAME[cell.type] }
+      break
+    }
+  }
+  return null
 }

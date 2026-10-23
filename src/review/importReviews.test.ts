@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const saved: string[] = []
+const summariesSaved: string[] = []
 const meta = new Map<string, unknown>()
 vi.mock('./cache', () => ({
   saveReviews: async (entries: { review: { gameId: string } }[]) => void saved.push(...entries.map((e) => e.review.gameId)),
+  saveSummaries: async (list: { gameId: string }[]) => {
+    summariesSaved.push(...list.map((s) => s.gameId))
+    return list.length
+  },
   getMeta: async (k: string) => meta.get(k),
   setMeta: async (k: string, v: unknown) => void meta.set(k, v),
 }))
@@ -26,9 +31,18 @@ function serve(files: Record<string, ArrayBuffer | string>) {
 describe('importDownloadedReviews', () => {
   beforeEach(() => {
     saved.length = 0
+    summariesSaved.length = 0
     meta.clear()
   })
   afterEach(() => vi.unstubAllGlobals())
+
+  it('stores summary-only lines as summaries, leaving reviews alone', async () => {
+    const text = [JSON.stringify({ summary: { gameId: 's1', format: SUMMARY_FORMAT } }), JSON.stringify({ review: { gameId: 'r1' }, summary: { gameId: 'r1', format: SUMMARY_FORMAT } })].join('\n')
+    serve({ 'c.ndjson.gz': text })
+    expect(await importDownloadedReviews()).toEqual({ files: 1, reviews: 2 })
+    expect(saved).toEqual(['r1'])
+    expect(summariesSaved).toEqual(['s1'])
+  })
 
   it('reads gzipped files and ones the server already unzipped', async () => {
     const many = Array.from({ length: 450 }, (_, i) => `g${i}`)

@@ -170,6 +170,14 @@
   background: linear-gradient(to top, var(--ink-2) 50%, transparent 50%);
 }
 
+.home-run {
+  margin-left: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
 .form-cell:hover {
   outline: 1px solid var(--ink);
   outline-offset: 1px;
@@ -321,4 +329,25 @@
     position: static;
     max-width: 560px;
   }
+}
+
+/* GitHub reviews, at the top of "Not reviewed yet". */
+.cloud {
+  margin-bottom: 10px;
+}
+
+.cloud p {
+  margin: 0 0 8px;
+}
+
+.cloud .progress {
+  margin: 4px 0 10px;
+}
+
+.cloud-send .btn {
+  margin-bottom: 6px;
+}
+
+.cloud-error {
+  color: var(--tone-blunder);
 }

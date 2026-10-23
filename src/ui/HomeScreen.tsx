@@ -1,13 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChessComGame } from '../chesscom/api'
 import type { GameFacts } from '../insights/facts'
 import { PerfBar, Sparkline } from './charts'
+import { usePageVisible } from './pageVisible'
 import { findings, type RankedFinding } from './findings'
+import { flare } from './fire'
 import { finalFen, moveCount, openingName } from './gameSummary'
 import { myResult, opponentOf, outcomeText, RESULT_TEXT, shortDate, sideOf } from './gameText'
 import { GameViewer } from './GameViewer'
 import { GamesDrawer, type Drill } from './GamesDrawer'
 import { useHistory } from './history'
+import { CloudStatus } from './CloudStatus'
+import { useCloud } from './cloud'
 import { MiniBoard } from './MiniBoard'
 import { loadSolved, practicePool } from './practice'
 import type { PracticeFocus } from './PracticeScreen'
@@ -20,6 +24,8 @@ type Props = {
   onOpen: (game: ChessComGame, ply?: number) => void
   onView: (v: View) => void
   onPractice: (focus: PracticeFocus | null) => void
+  /** Engine depth for reviews started from here */
+  depth: number
 }
 
 const DAY = 86400
@@ -27,7 +33,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`
 const signed = (x: number) => `${x > 0 ? '+' : x < 0 ? '−' : ''}${Math.abs(x)}`
 
 /** Where you stand today, your latest game, and the one thing most worth working on. */
-export function HomeScreen({ username, onUsername, onOpen, onView, onPractice }: Props) {
+export function HomeScreen({ username, onUsername, onOpen, onView, onPractice, depth }: Props) {
   const { games, facts, summaries, summariesLoaded, summaryById, byUuid, progress, error } = useHistory()
   const [boardId, setBoardId] = useState<string | null>(null)
   const [drill, setDrill] = useState<Drill | null>(null)
@@ -52,6 +58,25 @@ export function HomeScreen({ username, onUsername, onOpen, onView, onPractice }:
     const solved = loadSolved()
     return pool.filter((p) => !solved.has(p.id)).length
   }, [pool])
+  // Your current run of wins; three or more and the fire flares when you open Home.
+  const winRun = useMemo(() => {
+    let n = 0
+    for (const g of games ?? []) {
+      if (myResult(g, me) !== 'won') break
+      n++
+    }
+    return n
+  }, [games, me])
+  const visible = usePageVisible()
+  const cloud = useCloud()
+  const flaredFor = useRef<string | null>(null)
+  useEffect(() => {
+    const latest = games?.[0]?.uuid ?? null
+    if (!visible || winRun < 3 || flaredFor.current === latest) return
+    flaredFor.current = latest
+    flare()
+  }, [visible, winRun, games])
+
   const topPractice = useMemo(() => (top ? pool.filter((p) => top.f.ids.has(p.gameId)).length : 0), [top, pool])
 
   if (!username) return <Welcome onUsername={onUsername} />
@@ -188,9 +213,10 @@ export function HomeScreen({ username, onUsername, onOpen, onView, onPractice }:
             )}
           </section>
 
-          {reviewNext.length > 0 && (
+          {(reviewNext.length > 0 || cloud?.active || cloud?.syncing || cloud?.imported || cloud?.error) && (
             <section className="home-block">
               <h2>Not reviewed yet</h2>
+              <CloudStatus depth={depth} />
               <ol className="home-games">
                 {reviewNext.map((g) => (
                   <GameLine key={g.uuid} game={g} me={me} on={board?.uuid === g.uuid} onShow={() => setBoardId(g.uuid)} action="Review" onAction={() => onOpen(g)} />
@@ -219,6 +245,11 @@ export function HomeScreen({ username, onUsername, onOpen, onView, onPractice }:
                   />
                 )
               })}
+              {winRun >= 3 && (
+                <span className="home-run">
+                  <span className="num">{winRun}</span> wins in a row
+                </span>
+              )}
             </span>
             <ol className="home-games">
               {recent.map((g) => (

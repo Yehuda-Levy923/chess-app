@@ -45,6 +45,11 @@ export function InsightsOpenings({ games, filterSide, onDrill, focus = null, sum
     return sort === 'games' ? list.sort((a, b) => b.games - a.games) : list.sort((a, b) => b.cost - a.cost)
   }, [mine, side, sort])
   const maxGames = Math.max(1, ...rows.map((r) => r.games))
+  // chess.com's opening Mastery: how long you stay in known theory, in full moves.
+  const bookMoves = (list: { bookPlies: number }[]) => (list.length ? list.reduce((s, g) => s + g.bookPlies, 0) / list.length / 2 : null)
+  const bookAll = bookMoves(mine)
+  const selectedRow = selected ? rows.find((x) => x.family === selected) : undefined
+  const bookSelected = selectedRow ? bookMoves(selectedRow.facts) : null
 
   const pickSide = (s: Side) => {
     setLocalSide(s)
@@ -103,6 +108,17 @@ export function InsightsOpenings({ games, filterSide, onDrill, focus = null, sum
             )
           })}
         </ol>
+        {bookAll !== null && (
+          <p className="openings-mastery">
+            You stay in book for <span className="num">{bookAll.toFixed(1)}</span> moves on average as {side === 'white' ? 'White' : 'Black'}
+            {selectedRow && bookSelected !== null ? (
+              <>
+                , <span className="num">{bookSelected.toFixed(1)}</span> in the {selectedRow.family}
+              </>
+            ) : null}
+            .
+          </p>
+        )}
         <p className="dim note">
           Last column: points per 100 games above or below what the ratings predicted; bold when it's unlikely to be chance. Families with fewer than 10 games are
           left out.
