@@ -16,6 +16,7 @@ import { InsightsMoves } from './InsightsMoves'
 import { InsightsSkills } from './InsightsSkills'
 import { InsightsSummary } from './InsightsSummary'
 import { InsightsTactics } from './InsightsTactics'
+import { ChoiceRow, colourOptions } from './ChoiceRow'
 import { useHistory } from './history'
 import { ImportReviews } from './ImportReviews'
 import './InsightsScreen.css'
@@ -152,36 +153,17 @@ export function InsightsScreen({ username, onOpen }: Props) {
     <main className="insights">
       <header className="insights-head">
         <h1 className="page-title">Insights</h1>
+        {/* Rows of choices rather than dropdowns: every option is in view, and the
+            colour is picked by its king, in the player's own piece set. */}
         <div className="insights-filters">
-          <label>
-            <span>Time control</span>
-            <select value={timeClass} onChange={(e) => setTimeClass(e.target.value)}>
-              <option value="all">All</option>
-              {timeClasses.map(([tc, n]) => (
-                <option key={tc} value={tc}>
-                  {capitalise(tc)}, {n.toLocaleString()} games
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Playing</span>
-            <select value={side} onChange={(e) => setSide(e.target.value as Side | 'both')}>
-              <option value="both">Either colour</option>
-              <option value="white">White</option>
-              <option value="black">Black</option>
-            </select>
-          </label>
-          <label>
-            <span>Period</span>
-            <select value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}>
-              {PERIODS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ChoiceRow
+            label="Time control"
+            value={timeClass}
+            onChange={setTimeClass}
+            options={[['all', facts.length] as [string, number], ...timeClasses].map(([tc, n]) => ({ id: tc, label: tc === 'all' ? 'All' : capitalise(tc), title: `${n.toLocaleString()} games` }))}
+          />
+          <ChoiceRow<Side | 'both'> label="Playing" value={side} onChange={setSide} options={colourOptions('both')} />
+          <ChoiceRow label="Period" value={period} onChange={setPeriod} options={PERIODS.map((p) => ({ id: p.id, label: p.name.replace('Last ', '') }))} />
         </div>
       </header>
 

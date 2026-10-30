@@ -22,7 +22,8 @@
 .games-search {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 8px 22px;
   margin-top: 20px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--rule-strong);

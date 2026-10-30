@@ -21,8 +21,70 @@
 
 .insights-filters {
   display: flex;
-  gap: 10px;
+  gap: 10px 28px;
   flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+/* Filter choices set as words in a row, underlined when chosen, like the tabs below. */
+.filter-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.filter-opt {
+  height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-3);
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    color 120ms,
+    border-color 120ms;
+}
+
+.filter-opt:hover {
+  color: var(--ink);
+}
+
+.filter-opt.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.filter-king {
+  width: 38px;
+  padding: 0 4px;
+}
+
+.filter-king img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  opacity: 0.6;
+  transition: opacity 120ms;
+}
+
+.filter-king.on img,
+.filter-king:hover img {
+  opacity: 1;
+}
+
+.king-split {
+  display: flex;
+}
+
+.king-split .left {
+  clip-path: inset(0 50% 0 0);
+}
+
+.king-split .right {
+  margin-left: -28px;
+  clip-path: inset(0 0 0 50%);
 }
 
 .insights-filters label {

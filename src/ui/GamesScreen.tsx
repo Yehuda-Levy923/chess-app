@@ -8,6 +8,7 @@ import { GameViewer } from './GameViewer'
 import { useHistory } from './history'
 import { notForBoard, onScreen } from './keys'
 import { MiniBoard } from './MiniBoard'
+import { ChoiceRow, colourOptions } from './ChoiceRow'
 import './GamesScreen.css'
 
 type Props = {
@@ -129,25 +130,26 @@ export function GamesScreen({ username, onOpen }: Props) {
           aria-label="Search by opponent or opening"
           disabled={!facts}
         />
-        <select aria-label="Result" value={filters.result} onChange={(e) => setFilter({ result: e.target.value as Filters['result'] })} disabled={!facts}>
-          <option value="all">Any result</option>
-          <option value="won">Won</option>
-          <option value="drawn">Drawn</option>
-          <option value="lost">Lost</option>
-        </select>
-        <select aria-label="Time control" value={filters.time} onChange={(e) => setFilter({ time: e.target.value })} disabled={!facts}>
-          <option value="all">Any time control</option>
-          {timeClasses.map((t) => (
-            <option key={t} value={t}>
-              {t[0].toUpperCase() + t.slice(1)}
-            </option>
-          ))}
-        </select>
-        <select aria-label="Colour" value={filters.side} onChange={(e) => setFilter({ side: e.target.value as Filters['side'] })} disabled={!facts}>
-          <option value="all">Either colour</option>
-          <option value="white">As White</option>
-          <option value="black">As Black</option>
-        </select>
+        <ChoiceRow<Filters['result']>
+          label="Result"
+          value={filters.result}
+          onChange={(result) => setFilter({ result })}
+          disabled={!facts}
+          options={[
+            { id: 'all', label: 'Any' },
+            { id: 'won', label: 'Won' },
+            { id: 'drawn', label: 'Drawn' },
+            { id: 'lost', label: 'Lost' },
+          ]}
+        />
+        <ChoiceRow
+          label="Time control"
+          value={filters.time}
+          onChange={(time) => setFilter({ time })}
+          disabled={!facts}
+          options={[{ id: 'all', label: 'All' }, ...timeClasses.map((t) => ({ id: t, label: t[0].toUpperCase() + t.slice(1) }))]}
+        />
+        <ChoiceRow<Filters['side']> label="Colour" value={filters.side} onChange={(side) => setFilter({ side })} disabled={!facts} options={colourOptions('all')} />
         {filtering && (
           <button className="btn btn-quiet" type="button" onClick={() => setFilter(NO_FILTERS)}>
             Clear

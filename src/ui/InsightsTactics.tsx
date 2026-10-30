@@ -4,6 +4,7 @@ import type { MoveRef, ReviewedGame } from '../insights/engineStats'
 import { derived } from './derived'
 import type { Drill } from './GamesDrawer'
 import { movesDrill } from './moveDrill'
+import { ChoiceRow, PieceIcon } from './ChoiceRow'
 
 type Props = {
   games: ReviewedGame[]
@@ -91,28 +92,18 @@ export function InsightsTactics({ games, onDrill }: Props) {
         ) : (
           <>
             <div className="brilliant-filters">
-              <label>
-                <span>Piece</span>
-                <select value={piece} onChange={(e) => setPiece(e.target.value)}>
-                  <option value="all">Any piece</option>
-                  {pieces.map((p) => (
-                    <option key={p} value={p}>
-                      {PIECE_NAME[p] ?? p}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Time control</span>
-                <select value={timeClass} onChange={(e) => setTimeClass(e.target.value)}>
-                  <option value="all">Any</option>
-                  {classes.map((t) => (
-                    <option key={t} value={t}>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <ChoiceRow
+                label="Piece"
+                value={piece}
+                onChange={setPiece}
+                options={[{ id: 'all', label: 'Any piece' }, ...pieces.map((p) => ({ id: p, label: <PieceIcon piece={p} />, title: PIECE_NAME[p] ?? p }))]}
+              />
+              <ChoiceRow
+                label="Time control"
+                value={timeClass}
+                onChange={setTimeClass}
+                options={[{ id: 'all', label: 'Any' }, ...classes.map((t) => ({ id: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))]}
+              />
             </div>
             <p>
               <span className="num">{shown.length.toLocaleString()}</span> brilliant {shown.length === 1 ? 'move' : 'moves'}

@@ -5,6 +5,7 @@ import { derived } from './derived'
 import type { Drill } from './GamesDrawer'
 import { openingRows, typicalLine } from './openingLines'
 import { OpeningTree } from './OpeningTree'
+import { ChoiceRow } from './ChoiceRow'
 
 type Props = {
   games: GameFacts[]
@@ -70,13 +71,17 @@ export function InsightsOpenings({ games, filterSide, onDrill, focus = null, sum
               ))}
             </div>
           )}
-          <label className="openings-sort">
-            Sort by
-            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="games">Most played</option>
-              <option value="cost">Most points lost</option>
-            </select>
-          </label>
+          <div className="openings-sort">
+            <ChoiceRow<Sort>
+              label="Sort by"
+              value={sort}
+              onChange={setSort}
+              options={[
+                { id: 'games', label: 'Most played' },
+                { id: 'cost', label: 'Most points lost' },
+              ]}
+            />
+          </div>
         </div>
 
         <ol className="opening-rows">
