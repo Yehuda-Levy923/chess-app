@@ -79,15 +79,13 @@ export function InsightsSkills({ games, onDrill }: Props) {
         </table>
       )}
       <p className="dim note">
-        The rating your average accuracy in each phase plays like, over your latest 100 reviewed games, with the change from the 100 before. It measures the level
-        of your play, not your rank among players at your rating. Endgames often begin already decided, where few moves change much, so they tend to read high.
+        Your latest 100 reviewed games. Under each rating: the change from the 100 before, then your accuracy. Endgames read high, since many start already decided.
       </p>
 
       <h2>Tactics</h2>
       <p>
         You found <span className="num">{found + missed ? Math.round((found / (found + missed)) * 100) : 0}%</span> of the mates, forks and pins the engine wanted (
-        <span className="num">{found.toLocaleString()}</span> of <span className="num">{(found + missed).toLocaleString()}</span>). The Tactics tab breaks this down,
-        with the ones you allowed.
+        <span className="num">{found.toLocaleString()}</span> of <span className="num">{(found + missed).toLocaleString()}</span>).
       </p>
 
       <h2>Strongest and weakest phase</h2>
