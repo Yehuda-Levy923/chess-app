@@ -7,7 +7,7 @@ import { MIN_REVIEW_DEPTH } from '../review/analyseGame'
 import { classifyPlayedMove, LABELS, movesFromPgn, terminalScore, type Judgement } from '../review/buildReview'
 import { estimateRating } from '../review/gameRating'
 import { phaseGrades, phaseStarts, type PhaseName } from '../review/phases'
-import { reviewGame } from '../review/reviewGame'
+import { reviewGame, reviewLocalGame } from '../review/reviewGame'
 import { formatScore, uciToSan } from '../review/format'
 import type { Label, PositionAnalysis, Review, ReviewedMove } from '../review/types'
 import { getEngine } from '../stockfish/shared'
@@ -23,13 +23,23 @@ import { KEY_LABELS, LABEL_TEXT, toneOf } from './labels'
 import { useHistory } from './history'
 import { useLiveAnalysis, type Live } from './liveAnalysis'
 import { MoveList } from './MoveList'
+import type { LocalGame } from './localGame'
 import { playCue, playMove as soundMove } from './sound'
 import { judge, RetryPanel, type Attempt } from './RetryPanel'
 import { useDeepen } from './useDeepen'
 import { sparksFrom } from './fire'
 import './ReviewScreen.css'
 
-type Props = { game: ChessComGame; username: string; depth: number; onBack: () => void; /** Open on this move instead of the start */ startPly?: number | null }
+type Props = {
+  game: ChessComGame
+  /** Set for a game from this app rather than chess.com */
+  local?: LocalGame | null
+  username: string
+  depth: number
+  onBack: () => void
+  /** Open on this move instead of the start */
+  startPly?: number | null
+}
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const RETRY_LABELS = ['mistake', 'miss', 'blunder']
@@ -86,8 +96,8 @@ function writeFlag(key: string, on: boolean) {
   }
 }
 
-export function ReviewScreen({ game, username, depth, onBack, startPly = null }: Props) {
-  const mySide = game.black.username.toLowerCase() === username.toLowerCase() ? 'black' : 'white'
+export function ReviewScreen({ game, local = null, username, depth, onBack, startPly = null }: Props) {
+  const mySide = local?.me ?? (game.black.username.toLowerCase() === username.toLowerCase() ? 'black' : 'white')
   const { appearance, openSettings } = useAppearance()
   const [review, setReview] = useState<Review | null>(null)
   const [progress, setProgress] = useState<[number, number] | null>(null)
@@ -107,7 +117,10 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
   useEffect(() => {
     const abort = new AbortController()
     ;(async () => {
-      const { review: r } = await reviewGame(game, depth, getEngine(), (d, t) => setProgress([d, t]), abort.signal)
+      const onProgress = (d: number, t: number) => setProgress([d, t])
+      const r = local
+        ? await reviewLocalGame(game, depth, getEngine(), local.searched, onProgress, abort.signal)
+        : (await reviewGame(game, depth, getEngine(), onProgress, abort.signal)).review
       if (abort.signal.aborted) return
       setReview(r)
       if (startPly !== null) setPly(Math.max(0, Math.min(r.moves.length, startPly)))
@@ -115,7 +128,7 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
       if (!abort.signal.aborted) setError(e instanceof Error ? e.message : String(e))
     })
     return () => abort.abort()
-  }, [game, depth])
+  }, [game, local, depth])
 
   const n = review?.moves.length ?? 0
   const go = useCallback(
@@ -208,7 +221,8 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
 
   // The position on the board: a retry, an explored line, or the game itself.
   const retryTarget = retry ? targets[retry.index] : null
-  const mainFen = (p: number) => (p > 0 && review ? review.moves[p - 1].fenAfter : START_FEN)
+  // A game from the analysis board, or played from a position set up there, can start anywhere.
+  const mainFen = (p: number) => (p > 0 && review ? review.moves[p - 1].fenAfter : (review?.moves[0]?.fenBefore ?? START_FEN))
   const varMove = variation && variation.index > 0 ? variation.moves[variation.index - 1] : null
   const fen = retryTarget
     ? (retry!.fen ?? retryTarget.fenBefore)
@@ -218,7 +232,7 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
   const live = useLiveAnalysis(fen, !!review && engineOn && !retry, memo)
   // Deeper live searches of game positions update the review itself.
   const { refreshSummaries } = useHistory()
-  const deepened = useDeepen({ game, review, setReview, ply, live: !variation && !retry ? live : null, onSaved: refreshSummaries })
+  const deepened = useDeepen({ game, review, setReview, ply, live: !variation && !retry ? live : null, save: !local, onSaved: refreshSummaries })
   const positions = useMemo(() => {
     try {
       return movesFromPgn(game.pgn).length + 1
@@ -459,7 +473,7 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
       <div className="player">
         <span className={`player-swatch ${side}`} aria-hidden />
         <span className="player-name">{p.username}</span>
-        <span className="num dim">{p.rating}</span>
+        {p.rating > 0 && <span className="num dim">{p.rating}</span>}
         <span className="player-captures" aria-label={`Captured: ${mine.join(' ') || 'nothing'}`}>
           {groupCaptures(mine).map((group, gi) => (
             <span key={gi} className="capture-group">
@@ -537,9 +551,11 @@ export function ReviewScreen({ game, username, depth, onBack, startPly = null }:
           <span className="panel-opening" title={review.opening ?? undefined}>
             {review.opening ?? 'Unnamed opening'}
           </span>
-          <a className="btn btn-quiet btn-icon" href={game.url} target="_blank" rel="noreferrer" aria-label="Open on chess.com" title="Open on chess.com">
-            <IconExternal />
-          </a>
+          {game.url && (
+            <a className="btn btn-quiet btn-icon" href={game.url} target="_blank" rel="noreferrer" aria-label="Open on chess.com" title="Open on chess.com">
+              <IconExternal />
+            </a>
+          )}
           <button className="btn btn-quiet btn-icon" onClick={openSettings} aria-label="Board and pieces" title="Board and pieces">
             <IconBoard />
           </button>

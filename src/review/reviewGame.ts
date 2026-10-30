@@ -56,6 +56,25 @@ export async function reviewGame(
   return { review, source: 'engine' }
 }
 
+/**
+ * A game from this app: played against the computer, or set up on the analysis
+ * board. Positions in `searched` (those searched during play) are reused and
+ * only the rest are searched now. Nothing is cached: the review cache feeds
+ * Insights and Practice, which are about chess.com games.
+ */
+export async function reviewLocalGame(
+  game: Pick<ChessComGame, 'uuid' | 'pgn'>,
+  depth: number,
+  engine: Pick<Engine, 'analyse' | 'newGame'>,
+  searched: ReadonlyMap<string, PositionAnalysis>,
+  onProgress: (done: number, total: number) => void,
+  signal?: AbortSignal,
+): Promise<Review> {
+  const moves = movesFromPgn(game.pgn)
+  const analyses = await analyseGame(engine, moves, depth, onProgress, signal, searched)
+  return buildReview(game.uuid, moves, analyses, getBook())
+}
+
 async function calibrationAnalyses(uuid: string, expected: number): Promise<PositionAnalysis[] | null> {
   if (!import.meta.env.DEV) return null
   try {

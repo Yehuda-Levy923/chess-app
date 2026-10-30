@@ -13,25 +13,31 @@ export const MAX_MS_PER_POSITION = 2000
  */
 export const MIN_REVIEW_DEPTH = 15
 
-/** Runs the engine over the start position and every position after a move. */
+/** One position, searched the way a review searches it. A finished game needs no search. */
+export function analysePosition(engine: Pick<Engine, 'analyse'>, fen: string, depth: number, signal?: AbortSignal): Promise<PositionAnalysis> {
+  const over = terminalScore(fen)
+  if (over) return Promise.resolve({ fen, depth, requestedDepth: depth, lines: [{ score: over, pv: [] }] })
+  return engine.analyse(fen, depth, MAX_MS_PER_POSITION, MIN_REVIEW_DEPTH, signal)
+}
+
+/**
+ * Runs the engine over the start position and every position after a move.
+ * Positions in `known`, by FEN, were searched already and are not searched again.
+ */
 export async function analyseGame(
   engine: Pick<Engine, 'analyse' | 'newGame'>,
   moves: Move[],
   depth: number,
   onProgress: (done: number, total: number) => void,
   signal?: AbortSignal,
+  known?: ReadonlyMap<string, PositionAnalysis>,
 ): Promise<PositionAnalysis[]> {
   const fens = [moves[0]?.before ?? 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', ...moves.map((m) => m.after)]
   await engine.newGame()
   const out: PositionAnalysis[] = []
   for (const fen of fens) {
     if (signal?.aborted) throw new DOMException('Review cancelled', 'AbortError')
-    const over = terminalScore(fen)
-    out.push(
-      over
-        ? { fen, depth, requestedDepth: depth, lines: [{ score: over, pv: [] }] }
-        : await engine.analyse(fen, depth, MAX_MS_PER_POSITION, MIN_REVIEW_DEPTH),
-    )
+    out.push(known?.get(fen) ?? (await analysePosition(engine, fen, depth)))
     onProgress(out.length, fens.length)
   }
   return out

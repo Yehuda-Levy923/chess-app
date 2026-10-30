@@ -22,7 +22,10 @@ class FakeStockfish implements WorkerLike {
 
   postMessage(cmd: string) {
     this.sent.push(cmd)
-    if (cmd === 'uci') this.emit('uciok')
+    if (cmd === 'uci') {
+      this.emit('option name UCI_Elo type spin default 1320 min 1320 max 3190')
+      this.emit('uciok')
+    }
     else if (cmd === 'isready') this.emit('readyok')
     else if (cmd.startsWith('setoption name MultiPV value')) this.multiPv = Number(cmd.split(' ').at(-1))
     else if (cmd.startsWith('position fen')) {
@@ -30,7 +33,7 @@ class FakeStockfish implements WorkerLike {
       this.capped = false
     } else if (cmd.startsWith('go')) {
       // The first timed search of a position runs out of time at capDepth.
-      const depth = Number(cmd.match(/depth (\d+)/)![1])
+      const depth = Number(cmd.match(/depth (\d+)/)?.[1] ?? 1)
       const cap = this.capDepth !== null && cmd.includes('movetime') && !this.capped
       this.capped ||= cap
       this.search(cap ? Math.min(depth, this.capDepth!) : depth)
@@ -92,6 +95,27 @@ describe('Engine.analyse', () => {
     worker.capDepth = 8
     expect((await engine.analyse(START, 12, 2000, 15)).depth).toBe(12)
   })
+
+  it('stops on abort, rejects, and lets the next call run', async () => {
+    const { engine, worker } = setup()
+    const ctrl = new AbortController()
+    const search = engine.analyse(START, 99, 2000, 0, ctrl.signal)
+    setTimeout(() => ctrl.abort(), 5)
+    await expect(search).rejects.toMatchObject({ name: 'AbortError' })
+    expect(worker.sent).toContain('stop')
+    expect(await engine.bestMove(START, { movetime: 100 })).toBe('e2e4')
+  })
+
+  it('never starts a search that was cancelled while waiting in the queue', async () => {
+    const { engine, worker } = setup()
+    const ctrl = new AbortController()
+    const first = engine.analyse(START, 3)
+    const second = engine.analyse(START, 3, 2000, 0, ctrl.signal)
+    ctrl.abort()
+    await first
+    await expect(second).rejects.toMatchObject({ name: 'AbortError' })
+    expect(worker.sent.filter((c) => c.startsWith('go'))).toHaveLength(1)
+  })
 })
 
 describe('Engine.analyseLive', () => {
@@ -147,5 +171,29 @@ describe('Engine.analyseLive', () => {
     await first
     await expect(live).rejects.toMatchObject({ name: 'AbortError' })
     expect(worker.sent.filter((c) => c.startsWith('go'))).toHaveLength(1)
+  })
+})
+
+
+describe('Engine.bestMove', () => {
+  it('limits strength for the one move, clamped to the range the engine reports, then restores it', async () => {
+    const { engine, worker } = setup()
+    expect(await engine.bestMove(START, { elo: 900, movetime: 500 })).toBe('e2e4')
+    const opts = worker.sent.filter((c) => c.startsWith('setoption name UCI_') || c.startsWith('setoption name Skill'))
+    expect(opts).toEqual([
+      'setoption name UCI_LimitStrength value true',
+      'setoption name UCI_Elo value 1320',
+      'setoption name UCI_LimitStrength value false',
+      'setoption name Skill Level value 20',
+    ])
+    expect(worker.sent).toContain('go movetime 500')
+  })
+
+  it('uses Skill Level and a shallow depth below the calibrated range', async () => {
+    const { engine, worker } = setup()
+    await engine.bestMove(START, { skill: 3, depth: 2, movetime: 300 })
+    expect(worker.sent).toContain('setoption name Skill Level value 3')
+    expect(worker.sent).toContain('go depth 2 movetime 300')
+    expect(worker.sent.at(-1)).toBe('setoption name Skill Level value 20')
   })
 })

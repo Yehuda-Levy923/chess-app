@@ -19,6 +19,13 @@ export type EngineOptions = { threads?: number; hashMb?: number; multiPv?: numbe
 
 export type LiveUpdate = { depth: number; lines: EngineLine[] }
 
+/**
+ * How strongly a bot plays. `elo` uses Stockfish's own UCI_Elo calibration and
+ * is clamped to the range the engine reports; below that range, `skill` (0 to
+ * 20) and a shallow `depth` are the only levers there are.
+ */
+export type BotStrength = { elo?: number; skill?: number; depth?: number; movetime: number }
+
 export type LiveOptions = {
   multiPv: number
   maxDepth?: number
@@ -40,6 +47,8 @@ export class Engine {
   private queue: Promise<unknown> = Promise.resolve()
   private ready: Promise<void>
   private multiPv: number
+  /** UCI_Elo's min and max, read from the engine's own option list */
+  private eloRange: [number, number] | null = null
 
   constructor(opts: EngineOptions = {}) {
     this.worker = opts.worker ?? (new Worker(WORKER_URL) as unknown as WorkerLike)
@@ -58,7 +67,11 @@ export class Engine {
   }
 
   private async handshake(threads: number, hashMb: number, multiPv: number) {
-    await this.sendAndWait('uci', (l) => l === 'uciok')
+    await this.sendAndWait('uci', (l) => {
+      const elo = /^option name UCI_Elo type spin .*min (\d+) max (\d+)/.exec(l)
+      if (elo) this.eloRange = [Number(elo[1]), Number(elo[2])]
+      return l === 'uciok'
+    })
     this.send(`setoption name Threads value ${threads}`)
     this.send(`setoption name Hash value ${hashMb}`)
     this.send(`setoption name MultiPV value ${multiPv}`)
@@ -68,19 +81,29 @@ export class Engine {
   /**
    * Searches to `depth`, or for at most `maxMs` when given, whichever comes
    * first. The cap matters: on a sharp position a fixed depth can take tens of
-   * seconds in WASM.
+   * seconds in WASM. Aborting `signal` stops the search and rejects with an
+   * AbortError, as analyseLive does.
    */
-  analyse(fen: string, depth: number, maxMs: number = DEFAULT_MAX_MS, minDepth = 0): Promise<PositionAnalysis> {
+  analyse(fen: string, depth: number, maxMs: number = DEFAULT_MAX_MS, minDepth = 0, signal?: AbortSignal): Promise<PositionAnalysis> {
     const run = async () => {
       await this.ready
+      if (signal?.aborted) throw abortError()
       const whiteToMove = fen.split(' ')[1] === 'w'
       const search = async (go: string) => {
         const lines = new LineCollector()
-        await this.sendAndWait(go, (l) => {
+        const searching = this.sendAndWait(go, (l) => {
           const info = parseInfo(l, whiteToMove)
           if (info) lines.add(info)
           return l.startsWith('bestmove')
         })
+        const stop = () => this.send('stop')
+        signal?.addEventListener('abort', stop, { once: true })
+        try {
+          await searching
+        } finally {
+          signal?.removeEventListener('abort', stop)
+        }
+        if (signal?.aborted) throw abortError()
         return lines.result()
       }
       this.send(`position fen ${fen}`)
@@ -139,6 +162,42 @@ export class Engine {
       }
       if (signal.aborted) throw abortError()
       return { fen, requestedDepth: maxDepth, ...lines.result() }
+    }
+    return this.enqueue(run)
+  }
+
+  /**
+   * The move a bot of this strength plays. The strength options are set for
+   * this call only and put back afterwards, so a review queued behind it
+   * searches at full strength.
+   */
+  bestMove(fen: string, strength: BotStrength): Promise<string> {
+    const run = async () => {
+      await this.ready
+      const { elo, skill = 20, depth, movetime } = strength
+      if (elo !== undefined && this.eloRange) {
+        const [lo, hi] = this.eloRange
+        this.send('setoption name UCI_LimitStrength value true')
+        this.send(`setoption name UCI_Elo value ${Math.min(hi, Math.max(lo, Math.round(elo)))}`)
+      } else {
+        this.send(`setoption name Skill Level value ${skill}`)
+      }
+      this.send(`position fen ${fen}`)
+      let move = ''
+      try {
+        await this.sendAndWait(depth ? `go depth ${depth} movetime ${movetime}` : `go movetime ${movetime}`, (l) => {
+          if (!l.startsWith('bestmove')) return false
+          move = l.split(' ')[1] ?? ''
+          return true
+        })
+      } finally {
+        if (this.alive) {
+          this.send('setoption name UCI_LimitStrength value false')
+          this.send('setoption name Skill Level value 20')
+        }
+      }
+      if (!move || move === '(none)') throw new Error('Stockfish found no move in this position')
+      return move
     }
     return this.enqueue(run)
   }

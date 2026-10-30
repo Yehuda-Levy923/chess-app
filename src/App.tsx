@@ -10,6 +10,9 @@ import { InsightsScreen } from './ui/InsightsScreen'
 import { notForBoard } from './ui/keys'
 import { PageBoundary } from './ui/PageBoundary'
 import { PageVisible } from './ui/pageVisible'
+import { AnalysisScreen } from './ui/AnalysisScreen'
+import type { LocalGame } from './ui/localGame'
+import { PlayScreen } from './ui/PlayScreen'
 import { PracticeScreen, type PracticeFocus } from './ui/PracticeScreen'
 import { ReviewScreen } from './ui/ReviewScreen'
 import { Sidebar, type View } from './ui/Sidebar'
@@ -34,7 +37,9 @@ function remember(key: string, value: string) {
 
 const LOWEST_DEPTH = 16
 
-const VIEWS: View[] = ['home', 'games', 'practice', 'insights']
+const VIEWS: View[] = ['home', 'games', 'practice', 'insights', 'play', 'analysis']
+/** Pages that work before a chess.com username is set */
+const OPEN_VIEWS: View[] = ['home', 'play', 'analysis']
 
 export default function App() {
   const [username, setUsername] = useState(() => remembered('username', ''))
@@ -105,9 +110,14 @@ function Shell({ username, depth, onUsername, onSettings }: ShellProps) {
   })
   const [visited, setVisited] = useState<Set<View>>(() => new Set([view]))
   const [game, setGame] = useState<ChessComGame | null>(null)
+  // Set when the review is of a game from the play page or the analysis board.
+  const [local, setLocal] = useState<LocalGame | null>(null)
   // The move to open a review on, when it was opened from a specific moment.
   const [startPly, setStartPly] = useState<number | null>(null)
   const [practiceFocus, setPracticeFocus] = useState<PracticeFocus | null>(null)
+  // A finished game sent to the analysis board, or a position sent from it to play.
+  const [analysisSeed, setAnalysisSeed] = useState<{ pgn: string; key: number } | null>(null)
+  const [playSeed, setPlaySeed] = useState<{ fen: string; key: number } | null>(null)
 
   const setView = useCallback((v: View) => {
     setViewState(v)
@@ -117,8 +127,15 @@ function Shell({ username, depth, onUsername, onSettings }: ShellProps) {
 
   const openGame = useCallback((g: ChessComGame, ply?: number) => {
     setStartPly(ply ?? null)
+    setLocal(null)
     setGame(g)
     remember('lastGame', g.uuid)
+  }, [])
+
+  const openLocal = useCallback((l: LocalGame, ply?: number) => {
+    setStartPly(ply ?? null)
+    setLocal(l)
+    setGame(l.game)
   }, [])
 
   const practise = useCallback(
@@ -159,7 +176,7 @@ function Shell({ username, depth, onUsername, onSettings }: ShellProps) {
     <>
       {game && (
         <PageBoundary key={`${game.uuid}:${startPly ?? ''}`} name="Review">
-          <ReviewScreen game={game} username={username} depth={depth} startPly={startPly} onBack={() => setGame(null)} />
+          <ReviewScreen game={game} local={local} username={username} depth={depth} startPly={startPly} onBack={() => setGame(null)} />
         </PageBoundary>
       )}
       <div className="shell" hidden={!!game}>
@@ -169,7 +186,31 @@ function Shell({ username, depth, onUsername, onSettings }: ShellProps) {
           {username && page('games', <GamesScreen username={username} onOpen={openGame} />)}
           {username && page('practice', <PracticeScreen username={username} focus={practiceFocus} onClearFocus={() => setPracticeFocus(null)} onOpen={openGame} />)}
           {username && page('insights', <InsightsScreen username={username} onOpen={openGame} />)}
-          {!username && view !== 'home' && <HomeScreen username="" onUsername={onUsername} onOpen={openGame} onView={setView} onPractice={practise} depth={depth} />}
+          {page(
+            'play',
+            <PlayScreen
+              username={username}
+              depth={depth}
+              seed={playSeed}
+              onReview={openLocal}
+              onAnalyse={(pgn) => {
+                setAnalysisSeed({ pgn, key: Date.now() })
+                setView('analysis')
+              }}
+            />,
+          )}
+          {page(
+            'analysis',
+            <AnalysisScreen
+              seed={analysisSeed}
+              onReview={openLocal}
+              onPlayFrom={(fen) => {
+                setPlaySeed({ fen, key: Date.now() })
+                setView('play')
+              }}
+            />,
+          )}
+          {!username && !OPEN_VIEWS.includes(view) && <HomeScreen username="" onUsername={onUsername} onOpen={openGame} onView={setView} onPractice={practise} depth={depth} />}
         </div>
       </div>
     </>

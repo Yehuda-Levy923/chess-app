@@ -26,11 +26,13 @@ type Args = {
   ply: number
   /** Live analysis of that position, or null in a variation or retry */
   live: Live | null
+  /** Whether deeper reviews go to the review cache */
+  save: boolean
   /** Called once on leaving the screen if anything was saved, e.g. to refresh summaries */
   onSaved?: () => void
 }
 
-export function useDeepen({ game, review, setReview, ply, live, onSaved }: Args): Deepening | null {
+export function useDeepen({ game, review, setReview, ply, live, save, onSaved }: Args): Deepening | null {
   const [note, setNote] = useState<Deepening | null>(null)
   const reviewRef = useRef(review)
   reviewRef.current = review
@@ -38,8 +40,8 @@ export function useDeepen({ game, review, setReview, ply, live, onSaved }: Args)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastAt = useRef(new Map<number, number>())
   const saving = useRef<Promise<void> | null>(null)
-  const latest = useRef({ game, setReview, onSaved })
-  latest.current = { game, setReview, onSaved }
+  const latest = useRef({ game, setReview, save, onSaved })
+  latest.current = { game, setReview, save, onSaved }
 
   const flush = () => {
     if (timer.current) clearTimeout(timer.current)
@@ -60,7 +62,7 @@ export function useDeepen({ game, review, setReview, ply, live, onSaved }: Args)
     }
     reviewRef.current = after
     latest.current.setReview(after)
-    saving.current = (saving.current ?? Promise.resolve()).then(() => saveReview(after)).catch((e) => console.error(e))
+    if (latest.current.save) saving.current = (saving.current ?? Promise.resolve()).then(() => saveReview(after)).catch((e) => console.error(e))
     if (changes.length) setNote({ ply: p.ply, depth: p.live.depth, changes })
   }
 

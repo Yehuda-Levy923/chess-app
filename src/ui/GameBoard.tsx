@@ -21,6 +21,10 @@ type Props = {
   onPieceDrop?: (args: PieceDropHandlerArgs) => boolean
   /** Small boards (thumbnails, previews) skip coordinates and animation */
   small?: boolean
+  /** Click-to-move: the picked-up piece's square, and where it can go */
+  selected?: string | null
+  targets?: string[]
+  onSquareClick?: (square: string) => void
 }
 
 const pieceCache = new Map<string, PieceRenderObject>()
@@ -44,7 +48,7 @@ function piecesFor(set: PieceSetDef): PieceRenderObject {
   return pieces
 }
 
-export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, mark, check, hint, allowDragging = false, onPieceDrop, small = false }: Props) {
+export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, mark, check, hint, allowDragging = false, onPieceDrop, small = false, selected, targets, onSquareClick }: Props) {
   const { appearance } = useAppearance()
   const board = boardById(appearance.board)
   const pieces = useMemo(() => piecesFor(pieceSetById(appearance.pieces)), [appearance.pieces])
@@ -53,6 +57,8 @@ export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, m
   if (lastMove) for (const sq of lastMove) squareStyles[sq] = { background: 'var(--last-move)' }
   if (hint) squareStyles[hint] = { ...squareStyles[hint], boxShadow: 'inset 0 0 0 4px var(--hint, rgb(232 116 46 / 0.9))' }
   if (check) squareStyles[check] = { ...squareStyles[check], boxShadow: 'inset 0 0 0 3px var(--check)', background: 'var(--check-fill)' }
+  if (selected) squareStyles[selected] = { ...squareStyles[selected], background: 'var(--last-move)' }
+  const targetSet = new Set(targets ?? [])
 
   const visible = usePageVisible()
 
@@ -75,6 +81,7 @@ export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, m
           canDragPiece: ({ piece }) => piece.pieceType[0] === fen.split(' ')[1],
           allowDrawingArrows: !small,
           onPieceDrop,
+          onSquareClick: onSquareClick ? ({ square }) => onSquareClick(square) : undefined,
           showNotation: showCoords,
           showAnimations: !small,
           animationDurationInMs: 160,
@@ -87,6 +94,7 @@ export function GameBoard({ fen, orientation = 'white', arrows = [], lastMove, m
           squareRenderer: ({ square, children }) => (
             <div style={{ width: '100%', height: '100%', ...squareStyles[square] }}>
               {children}
+              {targetSet.has(square) && <span className="gameboard-target" aria-hidden />}
               {mark && mark.square === square && (
                 <span className={`gameboard-mark ${mark.label === 'brilliant' || mark.label === 'great' ? 'celebrate' : ''}`}>
                   <Badge label={mark.label} size={28} />

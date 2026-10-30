@@ -1,0 +1,307 @@
+/* Play and Analysis share one layout: the board with a player strip above and
+   below, and a panel beside it, sized to the window inside the sidebar. */
+
+.play,
+.analysis {
+  --board: min(calc(100vh - 116px), calc(100vw - 220px - 560px), 820px);
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  height: 100vh;
+  padding: 18px 28px;
+  animation: screen-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (max-width: 1100px) {
+  .play,
+  .analysis {
+    --board: min(calc(100vh - 116px), calc(100vw - 64px - 520px), 820px);
+  }
+}
+
+.play-board,
+.analysis-board {
+  position: relative;
+  width: var(--board);
+  height: var(--board);
+}
+
+.play-panel,
+.analysis-panel {
+  width: 400px;
+  max-height: calc(100vh - 36px);
+}
+
+/* Choosing an opponent: one piece per strength, in the player's own set. */
+.play-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 26px 22px;
+}
+
+.bot-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.bot,
+.side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: none;
+  color: var(--ink-2);
+  transition:
+    background-color 120ms,
+    border-color 120ms;
+}
+
+.bot img {
+  width: 58px;
+  height: 58px;
+  transition: transform 160ms ease-out;
+}
+
+.bot:hover,
+.side:hover {
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+
+.bot.on,
+.side.on {
+  border-color: var(--accent);
+  background: var(--select);
+  color: var(--ink);
+}
+
+.bot.on img {
+  transform: translateY(-3px);
+}
+
+.bot-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.bot-level {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.side-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.side img {
+  width: 44px;
+  height: 44px;
+}
+
+.side-split {
+  display: flex;
+}
+
+.side-split img {
+  width: 44px;
+  height: 44px;
+  clip-path: inset(0 50% 0 0);
+}
+
+.side-split img + img {
+  margin-left: -44px;
+  clip-path: inset(0 0 0 50%);
+}
+
+.play-go {
+  height: 44px;
+  font-size: 15px;
+}
+
+.play-from {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+/* During a game */
+.play-head {
+  justify-content: space-between;
+  padding-left: 16px;
+}
+
+.play-status {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  /* One line, so a longer status never pushes the move list down. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play-status.over {
+  color: var(--accent);
+}
+
+.play-moves {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.play-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.play-review-left {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* Promotion: the four pieces over a dimmed board. */
+.promote {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.45);
+  animation: fade-in 120ms ease-out both;
+}
+
+.promote-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+}
+
+.promote-piece {
+  width: calc(var(--board) / 8);
+  height: calc(var(--board) / 8);
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: var(--surface-sunk);
+}
+
+.promote-piece:hover,
+.promote-piece:focus-visible {
+  border-color: var(--accent);
+}
+
+.promote-piece img {
+  width: 100%;
+  height: 100%;
+}
+
+/* Analysis */
+.analysis-evalslot {
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.evalbar-off {
+  opacity: 0.35;
+}
+
+.analysis-nav {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding-left: 30px;
+}
+
+.analysis-head {
+  padding-left: 16px;
+  gap: 12px;
+}
+
+.analysis-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.analysis-moves {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.analysis-empty {
+  margin: 0;
+  padding: 16px;
+}
+
+.analysis-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.analysis-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.analysis-copied,
+.analysis-error {
+  font-size: 13px;
+  /* Holds its line even when empty, so a message never pushes the tools. */
+  min-height: 1.45em;
+}
+
+.analysis-error {
+  color: var(--tone-blunder);
+  flex: 1;
+  min-width: 0;
+}
+
+.analysis-paste {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.analysis-paste textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--surface-sunk);
+  font: 12.5px/1.4 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+.analysis-paste textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.play .board-col .player,
+.analysis .board-col .player {
+  padding-left: 0;
+}
